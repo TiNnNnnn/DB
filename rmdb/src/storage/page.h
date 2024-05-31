@@ -19,6 +19,12 @@ struct PageId {
     int fd;  //  Page所在的磁盘文件开启后的文件描述符, 来定位打开的文件在内存中的位置
     page_id_t page_no = INVALID_PAGE_ID;
 
+    PageId(){}
+
+    PageId(int fd,page_id_t page_no = INVALID_PAGE_ID)
+        :fd(fd),page_no(page_no)
+    {}
+
     friend bool operator==(const PageId &x, const PageId &y) { return x.fd == y.fd && x.page_no == y.page_no; }
     bool operator<(const PageId& x) const {
         if(fd < x.fd) return true;
@@ -57,11 +63,15 @@ class Page {
 
     ~Page() = default;
 
+    void set_id(PageId pid){id_ = pid;}
     PageId get_page_id() const { return id_; }
 
     inline char *get_data() { return data_; }
 
     bool is_dirty() const { return is_dirty_; }
+    void set_dirty(bool is_dirty){is_dirty_ = is_dirty;}
+
+
 
     static constexpr size_t OFFSET_PAGE_START = 0;
     static constexpr size_t OFFSET_LSN = 0;

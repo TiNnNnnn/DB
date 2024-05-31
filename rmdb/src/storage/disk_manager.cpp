@@ -53,7 +53,15 @@ void DiskManager::read_page(int fd, page_id_t page_no, char *offset, int num_byt
     // 1.lseek()定位到文件头，通过(fd,page_no)可以定位指定页面及其在磁盘文件中的偏移量
     // 2.调用read()函数
     // 注意read返回值与num_bytes不等时，throw InternalError("DiskManager::read_page Error");
-
+    int result = lseek(fd, page_no*PAGE_SIZE, SEEK_SET);
+    if (result != 0) {
+        throw InternalError("DiskManager::read_page lseek Error");
+    }
+    
+    int bytes_read = read(fd, offset, num_bytes);
+    if (bytes_read != num_bytes) {
+        throw InternalError("DiskManager::read_page read Error");
+    }
 }
 
 /**
@@ -108,7 +116,12 @@ bool DiskManager::is_file(const std::string &path) {
 void DiskManager::create_file(const std::string &path) {
     // Todo:
     // 调用open()函数，使用O_CREAT模式
-    // 注意不能重复创建相同文件
+    // 注意不能重复创建相同文件 
+    int fd = open(path.c_str(), O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (fd == -1) {
+        throw std::runtime_error("Failed to create file: " + path);
+    }
+    close(fd);
 }
 
 /**
@@ -119,9 +132,20 @@ void DiskManager::destroy_file(const std::string &path) {
     // Todo:
     // 调用unlink()函数
     // 注意不能删除未关闭的文件
-    
-}
+   
+    // 尝试以读写模式打开文件以检查文件是否被打开
 
+    // 检查文件是否在打开文件集合中
+    if (path2fd_.find(path) != path2fd_.end()) {
+        throw std::runtime_error("Cannot destroy file because it is currently open: " + path);
+    }
+
+    // 调用 unlink() 函数删除文件
+    if (unlink(path.c_str()) == -1) {
+        // 如果删除文件失败，抛出异常
+        throw std::runtime_error("Failed to destroy file: " + path);
+    }
+}
 
 /**
  * @description: 打开指定路径文件 
@@ -132,7 +156,24 @@ int DiskManager::open_file(const std::string &path) {
     // Todo:
     // 调用open()函数，使用O_RDWR模式
     // 注意不能重复打开相同文件，并且需要更新文件打开列表
+    // 调用 open() 函数以读写模式打开文件
 
+   // 检查文件是否已经在打开文件列表中
+    if (path2fd_.find(path) != path2fd_.end()) {
+        throw std::runtime_error("File is already open: " + path);
+    }
+
+    // 调用 open() 函数以读写模式打开文件
+    int fd = open(path.c_str(), O_RDWR);
+    if (fd == -1) {
+        // 如果文件打开失败，抛出异常
+        throw std::runtime_error("Failed to open file: " + path);
+    }
+    // 成功打开文件后，更新打开文件列表
+    fd2path_[fd]=path;
+    path2fd_[path] = fd;
+    // 返回文件句柄
+    return fd;
 }
 
 /**
@@ -143,7 +184,21 @@ void DiskManager::close_file(int fd) {
     // Todo:
     // 调用close()函数
     // 注意不能关闭未打开的文件，并且需要更新文件打开列表
+    // 检查文件句柄是否在文件句柄映射中
+    auto it = fd2path_.find(fd);
+    if (it == fd2path_.end()) {
+        throw std::runtime_error("File descriptor is not open: " + std::to_string(fd));
+    }
 
+    // 调用 close() 函数关闭文件
+    if (close(fd) == -1) {
+        throw std::runtime_error("Failed to close file descriptor: " + std::to_string(fd));
+    }
+
+    // 获取文件路径并更新打开文件列表和文件句柄映射
+    std::string path = it->second;
+    path2fd_.erase(path);
+    fd2path_.erase(it);
 }
 
 

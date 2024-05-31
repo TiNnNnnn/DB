@@ -22,12 +22,16 @@ LRUReplacer::~LRUReplacer() = default;
 bool LRUReplacer::victim(frame_id_t* frame_id) {
     // C++17 std::scoped_lock
     // 它能够避免死锁发生，其构造函数能够自动进行上锁操作，析构函数会对互斥量进行解锁操作，保证线程安全。
-    std::scoped_lock lock{latch_};  //  如果编译报错可以替换成其他lock
-
+    std::lock_guard<std::mutex> guard(latch_);
     // Todo:
     //  利用lru_replacer中的LRUlist_,LRUHash_实现LRU策略
     //  选择合适的frame指定为淘汰页面,赋值给*frame_id
-
+    if(LRUlist_.empty()){
+        return false;
+    }
+    *frame_id = LRUlist_.back();
+    LRUhash_.erase(*frame_id);
+    LRUlist_.pop_back();
     return true;
 }
 
@@ -36,10 +40,15 @@ bool LRUReplacer::victim(frame_id_t* frame_id) {
  * @param {frame_id_t} 需要固定的frame的id
  */
 void LRUReplacer::pin(frame_id_t frame_id) {
-    std::scoped_lock lock{latch_};
+    std::lock_guard<std::mutex> guard(latch_);
     // Todo:
     // 固定指定id的frame
     // 在数据结构中移除该frame
+    auto it = LRUhash_.find(frame_id);
+    if (it != LRUhash_.end()) {
+        LRUlist_.erase(it->second);
+        LRUhash_.erase(it);
+    }
 }
 
 /**
@@ -50,6 +59,11 @@ void LRUReplacer::unpin(frame_id_t frame_id) {
     // Todo:
     //  支持并发锁
     //  选择一个frame取消固定
+    std::lock_guard<std::mutex> guard(latch_);
+    if (LRUhash_.find(frame_id) == LRUhash_.end()) {
+        LRUlist_.push_front(frame_id);
+        LRUhash_[frame_id] = LRUlist_.begin();
+    }
 }
 
 /**

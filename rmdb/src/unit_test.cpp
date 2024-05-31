@@ -287,7 +287,7 @@ TEST_F(BufferPoolManagerTest, SampleTest) {
     auto bpm = std::make_unique<BufferPoolManager>(buffer_pool_size, disk_manager);
     // create tmp PageId
     int fd = BufferPoolManagerTest::fd_;
-    PageId page_id_temp = {.fd = fd, .page_no = INVALID_PAGE_ID};
+    PageId page_id_temp = {fd, INVALID_PAGE_ID};
     auto *page0 = bpm->new_page(&page_id_temp);
 
     // Scenario: The buffer pool is empty. We should be able to create a new page.
@@ -393,7 +393,7 @@ TEST_F(BufferPoolManagerConcurrencyTest, ConcurrencyTest) {
         std::vector<std::thread> threads;
         for (int tid = 0; tid < num_threads; tid++) {
             threads.push_back(std::thread([&bpm, fd]() {  // NOLINT
-                PageId temp_page_id = {.fd = fd, .page_no = INVALID_PAGE_ID};
+                PageId temp_page_id = {fd, INVALID_PAGE_ID};
                 std::vector<PageId> page_ids;
                 for (int i = 0; i < 10; i++) {
                     auto new_page = bpm->new_page(&temp_page_id);
@@ -471,7 +471,7 @@ TEST(StorageTest, SimpleTest) {
         for (page_id_t i = 0; i < MAX_PAGES; i++) {
             rand_buf(PAGE_SIZE, init_buf);  // 将init_buf填充PAGE_SIZE个字节的随机数据
 
-            PageId tmp_page_id = {.fd = fd, .page_no = INVALID_PAGE_ID};
+            PageId tmp_page_id = {fd, INVALID_PAGE_ID};
             Page *page = buffer_pool_manager->new_page(&tmp_page_id);
             int page_no = tmp_page_id.page_no;
             assert(page_no != INVALID_PAGE_ID);
