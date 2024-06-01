@@ -99,7 +99,6 @@ Page* BufferPoolManager::fetch_page(PageId page_id) {
         if (page->is_dirty_) {
             update_page(page, page_id, frame_id);
         }else{
-            std::cout<<"haha"<<std::endl;
             // 3. 调用 disk_manager_ 的 read_page 读取目标页到 frame
             disk_manager_->read_page(page_id.fd, page_id.page_no, page->data_, PAGE_SIZE);
         }
