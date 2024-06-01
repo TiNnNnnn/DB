@@ -97,7 +97,8 @@ Page* BufferPoolManager::fetch_page(PageId page_id) {
         Page *page = &pages_[frame_id];
         // 2. 若获得的可用 frame 存储的为 dirty page，则调用 updata_page 将 page 写回到磁盘
         if (page->is_dirty_) 
-            update_page(page, page_id, frame_id);
+           // update_page(page, page_id, frame_id);
+           disk_manager_->write_page(page->id_.fd, page->id_.page_no, page->data_, PAGE_SIZE);
         // 3. 调用 disk_manager_ 的 read_page 读取目标页到 frame
         disk_manager_->read_page(page_id.fd, page_id.page_no, page->data_, PAGE_SIZE);
         
