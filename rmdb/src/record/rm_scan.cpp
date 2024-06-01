@@ -41,7 +41,7 @@ void RmScan::next() {
 
     // 如果当前rid_是无效的，初始化为第一个记录页面和槽位
     if (start_page == RM_NO_PAGE) {
-        start_page = RM_FIRST_RECORD_PAGE - 1; // 从第0页开始，以便在循环内增量到第1页
+        start_page = RM_FIRST_RECORD_PAGE;
         start_slot = -1;
     }
 

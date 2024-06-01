@@ -60,6 +60,8 @@ Rid RmFileHandle::insert_record(char* buf, Context* context) {
     // 3. 将数据 buf 复制到空闲 slot 位置
     char* slot_ptr = page_handle.get_slot(slot_no);
     memcpy(slot_ptr, buf, file_hdr_.record_size);
+    Bitmap::set(page_handle.bitmap,slot_no);
+    
     // 4. 更新 page handle 中的页头数据结构
     page_handle.page_hdr->num_records++;
     // 5. 如果插入记录后页面已满，更新文件头中的 first_free_page_no
@@ -198,11 +200,13 @@ RmPageHandle RmFileHandle::create_new_page_handle() {
     // 3.更新file_hdr_
     
     // 1. 使用缓冲池来创建一个新page
-    PageId new_page_id;
-    Page *new_page = buffer_pool_manager_->new_page(&new_page_id);
+    PageId new_page_id(fd_,-1);
+    int new_page_no = file_hdr_.num_pages;
+    Page *new_page = buffer_pool_manager_->new_page(&new_page_id,new_page_no);
     if (new_page == nullptr) {
         throw std::runtime_error("Failed to create a new page in the buffer pool.");
     }
+
     // 2. 初始化新页面的页头信息
     RmPageHandle new_page_handle(&file_hdr_, new_page);
     RmPageHdr *page_hdr = new_page_handle.page_hdr;
@@ -217,7 +221,7 @@ RmPageHandle RmFileHandle::create_new_page_handle() {
     }
 
     // 5. 将文件头写回磁盘
-    //disk_manager_->write_page(fd_, RM_FILE_HDR_PAGE, reinterpret_cast<char *>(&file_hdr_), sizeof(file_hdr_));
+    disk_manager_->write_page(fd_, RM_FILE_HDR_PAGE, reinterpret_cast<char *>(&file_hdr_), sizeof(file_hdr_));
 
     return new_page_handle;
 }

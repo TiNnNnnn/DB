@@ -70,7 +70,7 @@ class BufferPoolManager {
 
     bool flush_page(PageId page_id);
 
-    Page* new_page(PageId* page_id);
+    Page* new_page(PageId* page_id,int pno = -1);
 
     bool delete_page(PageId page_id);
 

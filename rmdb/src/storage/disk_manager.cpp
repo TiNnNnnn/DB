@@ -32,7 +32,7 @@ void DiskManager::write_page(int fd, page_id_t page_no, const char *offset, int 
     // 2.调用write()函数
     // 注意write返回值与num_bytes不等时 throw InternalError("DiskManager::write_page Error");
     int result = lseek(fd, page_no*PAGE_SIZE, SEEK_SET);
-    if (result != 0) {
+    if (result != page_no*PAGE_SIZE) {
         throw InternalError("DiskManager::write_page lseek Error");
     }
     int bytes_written = write(fd, offset, num_bytes);
@@ -54,11 +54,12 @@ void DiskManager::read_page(int fd, page_id_t page_no, char *offset, int num_byt
     // 2.调用read()函数
     // 注意read返回值与num_bytes不等时，throw InternalError("DiskManager::read_page Error");
     int result = lseek(fd, page_no*PAGE_SIZE, SEEK_SET);
-    if (result != 0) {
+    if (result != page_no*PAGE_SIZE) {
         throw InternalError("DiskManager::read_page lseek Error");
     }
     
     int bytes_read = read(fd, offset, num_bytes);
+    //std::cout<<"bytes_read: "<<bytes_read<<" num_bytes: "<<num_bytes<<std::endl;
     if (bytes_read != num_bytes) {
         throw InternalError("DiskManager::read_page read Error");
     }
@@ -119,6 +120,9 @@ void DiskManager::create_file(const std::string &path) {
     // 注意不能重复创建相同文件 
     int fd = open(path.c_str(), O_CREAT | O_EXCL, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1) {
+        if (errno == EEXIST){
+            throw FileExistsError("file:"+ path + " has exists");
+        } 
         throw std::runtime_error("Failed to create file: " + path);
     }
     close(fd);
@@ -132,19 +136,30 @@ void DiskManager::destroy_file(const std::string &path) {
     // Todo:
     // 调用unlink()函数
     // 注意不能删除未关闭的文件
-   
-    // 尝试以读写模式打开文件以检查文件是否被打开
 
     // 检查文件是否在打开文件集合中
     if (path2fd_.find(path) != path2fd_.end()) {
         throw std::runtime_error("Cannot destroy file because it is currently open: " + path);
     }
 
+    // 检查文件是否存在
+    // if (access(path.c_str(), F_OK) == -1) {
+    //     return;
+    // }
+
     // 调用 unlink() 函数删除文件
     if (unlink(path.c_str()) == -1) {
         // 如果删除文件失败，抛出异常
-        throw std::runtime_error("Failed to destroy file: " + path);
+        if (errno == ENOENT) {
+            throw FileNotFoundError("file: " + path+" not exist");
+        } else {
+            throw std::runtime_error("Failed to destroy file: " + path);
+        }
+        
     }
+
+    
+
 }
 
 /**
@@ -167,7 +182,7 @@ int DiskManager::open_file(const std::string &path) {
     int fd = open(path.c_str(), O_RDWR);
     if (fd == -1) {
         // 如果文件打开失败，抛出异常
-        throw std::runtime_error("Failed to open file: " + path);
+        throw FileNotFoundError("Failed to open file: " + path);
     }
     // 成功打开文件后，更新打开文件列表
     fd2path_[fd]=path;
