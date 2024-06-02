@@ -28,6 +28,8 @@ struct ColMeta {
     int offset;             // 字段位于记录中的偏移量
     bool index;             /** unused */
 
+    
+
     friend std::ostream &operator<<(std::ostream &os, const ColMeta &col) {
         // ColMeta中有各个基本类型的变量，然后调用重载的这些变量的操作符<<（具体实现逻辑在defs.h）
         return os << col.tab_name << ' ' << col.name << ' ' << col.type << ' ' << col.len << ' ' << col.offset << ' '
@@ -63,6 +65,36 @@ struct IndexMeta {
         }
         return is;
     }
+
+    bool operator == (IndexMeta &index){
+        if(index.tab_name != tab_name || index.col_tot_len != col_tot_len 
+        || index.col_num != col_num){
+            return false;
+        }
+        if(index.cols.size() != cols.size())return false;
+        std::set<ColMeta>temp;
+        for(auto e: index.cols)temp.insert(e);
+
+        for(auto e: cols){
+            if(temp.find(e) == temp.end()){
+                return false;
+            }
+        }
+        return true;
+    }
+
+    bool operator == (const std::vector<std::string> &index){
+        if(index.size() != cols.size())return false;
+        std::set<std::string>temp;
+        for(auto e: index)temp.insert(e);
+
+        for(auto e: cols){
+            if(temp.find(e.name) == temp.end()){
+                return false;
+            }
+        }
+        return true;
+    }
 };
 
 /* 表元数据 */
@@ -91,6 +123,22 @@ struct TabMeta {
                 size_t i = 0;
                 for(; i < index.col_num; ++i) {
                     if(index.cols[i].name.compare(col_names[i]) != 0)
+                        break;
+                }
+                if(i == index.col_num) return true;
+            }
+        }
+
+        return false;
+    }
+
+    /* 判断当前表上是否建有指定索引，索引包含的字段为col_names */
+    bool is_index(const std::vector<ColMeta>& col_names) const {
+        for(auto& index: indexes) {
+            if(index.col_num == col_names.size()) {
+                size_t i = 0;
+                for(; i < index.col_num; ++i) {
+                    if(index.cols[i].name.compare(col_names[i].name) != 0)
                         break;
                 }
                 if(i == index.col_num) return true;
