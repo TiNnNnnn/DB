@@ -58,7 +58,9 @@ class RmManager {
      * @description: 删除表的数据文件
      * @param {string&} filename 要删除的文件名称
      */    
-    void destroy_file(const std::string& filename) { disk_manager_->destroy_file(filename); }
+    void destroy_file(const std::string& filename) { 
+        disk_manager_->destroy_file(filename); 
+    }
 
     // 注意这里打开文件，创建并返回了record file handle的指针
     /**

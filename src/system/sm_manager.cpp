@@ -244,9 +244,11 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
     }
 
     // 删除表的数据文件
+    disk_manager_->close_file(disk_manager_->get_file_fd(tab_name));
     rm_manager_->destroy_file(tab_name);
     fhs_.erase(tab_name);
     ihs_.erase(tab_name);
+
     // 从数据库元数据中移除表
     db_.tabs_.erase(tab_name);
     

@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 
 class Transaction {
    public:
-    explicit Transaction(txn_id_t txn_id, IsolationLevel isolation_level = IsolationLevel::SERIALIZABLE)
+    explicit Transaction(txn_id_t txn_id = INVALID_TXN_ID, IsolationLevel isolation_level = IsolationLevel::SERIALIZABLE)
         : state_(TransactionState::DEFAULT), isolation_level_(isolation_level), txn_id_(txn_id) {
         write_set_ = std::make_shared<std::deque<WriteRecord *>>();
         lock_set_ = std::make_shared<std::unordered_set<LockDataId>>();

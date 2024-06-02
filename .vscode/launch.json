@@ -12,6 +12,14 @@
             "program": "${workspaceFolder}/build/bin/unit_test",
             "args": [ "gtest_filter=BufferPoolManagerTest.SampleTest"],
             "cwd": "${workspaceFolder}",
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "rmdb",
+            "program": "${workspaceFolder}/build/bin/rmdb",
+            "args": [ "gtest_filter=BufferPoolManagerTest.SampleTest"],
+            "cwd": "${workspaceFolder}",
         }
     ]
 
