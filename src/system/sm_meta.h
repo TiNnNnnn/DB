@@ -66,35 +66,7 @@ struct IndexMeta {
         return is;
     }
 
-    bool operator == (IndexMeta &index){
-        if(index.tab_name != tab_name || index.col_tot_len != col_tot_len 
-        || index.col_num != col_num){
-            return false;
-        }
-        if(index.cols.size() != cols.size())return false;
-        std::set<ColMeta>temp;
-        for(auto e: index.cols)temp.insert(e);
-
-        for(auto e: cols){
-            if(temp.find(e) == temp.end()){
-                return false;
-            }
-        }
-        return true;
-    }
-
-    bool operator == (const std::vector<std::string> &index){
-        if(index.size() != cols.size())return false;
-        std::set<std::string>temp;
-        for(auto e: index)temp.insert(e);
-
-        for(auto e: cols){
-            if(temp.find(e.name) == temp.end()){
-                return false;
-            }
-        }
-        return true;
-    }
+    
 };
 
 /* 表元数据 */
