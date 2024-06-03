@@ -271,6 +271,9 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
         throw UnixError();
     }
     if (!db_.is_table(tab_name)) {
+        if (chdir("..") < 0) {
+        throw UnixError();
+    }
         throw TableNotFoundError(tab_name);
     }
     
