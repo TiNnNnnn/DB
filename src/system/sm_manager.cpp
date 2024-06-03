@@ -86,7 +86,7 @@ void SmManager::drop_db(const std::string& db_name) {
  * @param {string&} db_name 数据库名称，与文件夹同名
  */
 void SmManager::open_db(const std::string& db_name) {
-     if (!is_dir(db_name)) {
+    if (!is_dir(db_name)) {
         throw DatabaseNotFoundError(db_name);
     }
     if (chdir(db_name.c_str()) < 0) {  // 进入数据库目录
@@ -131,6 +131,9 @@ void SmManager::flush_meta() {
  * @description: 关闭数据库并把数据落盘
  */
 void SmManager::close_db() {
+    if (chdir("..") < 0) {
+        throw UnixError();
+    }
     if (db_.name_.empty()) {
         return;  // 如果当前没有打开的数据库，直接返回
     }
@@ -147,6 +150,11 @@ void SmManager::close_db() {
     ihs_.clear();
 
     db_ = DbMeta();  // 清空当前数据库元数据
+
+     // 回到根目录
+    if (chdir("..") < 0) {
+        throw UnixError();
+    }
 }
 
 /**
@@ -154,6 +162,13 @@ void SmManager::close_db() {
  * @param {Context*} context 
  */
 void SmManager::show_tables(Context* context) {
+    if (!is_dir(db_.name_)) {
+        throw DatabaseNotFoundError(db_.name_);
+    }
+    if (chdir(db_.name_.c_str()) < 0) {  // 进入数据库目录
+        throw UnixError();
+    }
+
     std::fstream outfile;
     outfile.open("output.txt", std::ios::out | std::ios::app);
     outfile << "| Tables |\n";
@@ -168,6 +183,10 @@ void SmManager::show_tables(Context* context) {
     }
     printer.print_separator(context);
     outfile.close();
+
+    if (chdir("..") < 0) {
+        throw UnixError();
+    }
 }
 
 /**
@@ -200,6 +219,12 @@ void SmManager::desc_table(const std::string& tab_name, Context* context) {
  * @param {Context*} context 
  */
 void SmManager::create_table(const std::string& tab_name, const std::vector<ColDef>& col_defs, Context* context) {
+    if (!is_dir(db_.name_)) {
+        throw DatabaseNotFoundError(db_.name_);
+    }
+    if (chdir(db_.name_.c_str()) < 0) {  // 进入数据库目录
+        throw UnixError();
+    }
     if (db_.is_table(tab_name)) {
         throw TableExistsError(tab_name);
     }
@@ -219,12 +244,18 @@ void SmManager::create_table(const std::string& tab_name, const std::vector<ColD
     }
     // Create & open record file
     int record_size = curr_offset;  // record_size就是col meta所占的大小（表的元数据也是以记录的形式进行存储的）
+    //std::string tab_file_name = db_.name_ + "/" + tab_name;
     rm_manager_->create_file(tab_name, record_size);
     db_.tabs_[tab_name] = tab;
     // fhs_[tab_name] = rm_manager_->open_file(tab_name);
     fhs_.emplace(tab_name, rm_manager_->open_file(tab_name));
 
     flush_meta();
+
+    // 回到根目录
+    if (chdir("..") < 0) {
+        throw UnixError();
+    }
 }
 
 /**
@@ -233,7 +264,13 @@ void SmManager::create_table(const std::string& tab_name, const std::vector<ColD
  * @param {Context*} context
  */
 void SmManager::drop_table(const std::string& tab_name, Context* context) {
-     if (!db_.is_table(tab_name)) {
+    if (!is_dir(db_.name_)) {
+        throw DatabaseNotFoundError(db_.name_);
+    }
+    if (chdir(db_.name_.c_str()) < 0) {  // 进入数据库目录
+        throw UnixError();
+    }
+    if (!db_.is_table(tab_name)) {
         throw TableNotFoundError(tab_name);
     }
     
@@ -253,6 +290,11 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
     db_.tabs_.erase(tab_name);
     
     flush_meta();
+
+    // 回到根目录
+    if (chdir("..") < 0) {
+        throw UnixError();
+    }
 }
 
 /**
@@ -262,6 +304,12 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
  * @param {Context*} context
  */
 void SmManager::create_index(const std::string& tab_name, const std::vector<std::string>& col_names, Context* context) {
+    if (!is_dir(db_.name_)) {
+        throw DatabaseNotFoundError(db_.name_);
+    }
+    if (chdir(db_.name_.c_str()) < 0) {  // 进入数据库目录
+        throw UnixError();
+    }
     if (!db_.is_table(tab_name)) {
         throw TableNotFoundError(tab_name);
     }
@@ -294,6 +342,13 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
     ihs_[index_name] = ix_manager_->open_index(tab_name, cols);
 
     flush_meta();
+
+    // 回到根目录
+    if (chdir("..") < 0) {
+        throw UnixError();
+    }
+
+    
 }
 
 /**

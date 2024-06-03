@@ -43,19 +43,118 @@ class SeqScanExecutor : public AbstractExecutor {
         context_ = context;
 
         fed_conds_ = conds_;
+
+        scan_ = std::make_unique<RmScan>(fh_);
     }
 
+    //找到第一条符合条件的记录
     void beginTuple() override {
-        
+        scan_->next(); // 移动到第一个记录
+        nextTuple();
     }
 
+    //找到下一个符合条件的记录
     void nextTuple() override {
-        
+        while (!scan_->is_end()) {
+            rid_ = scan_->rid();
+            auto record = fh_->get_record(rid_,nullptr);
+            // 检查记录是否符合条件
+            if (match_conditions(record.get(), fed_conds_)) {
+                return;
+            }
+            scan_->next();
+        }
     }
 
+    //获取当前记录
     std::unique_ptr<RmRecord> Next() override {
-        return nullptr;
+        if (scan_->is_end()) {
+            return nullptr;
+        }
+        auto record = fh_->get_record(rid_,nullptr);
+        nextTuple(); // 为下一个调用做准备
+        return record;
     }
 
     Rid &rid() override { return rid_; }
+
+    const std::vector<ColMeta> &cols() const override {
+        return cols_;
+    }
+
+    size_t tupleLen() const override {
+        return len_;
+    }
+
+     // 检查记录是否符合条件
+    bool match_conditions(const RmRecord *record, const std::vector<Condition> &conds) {
+        for (const auto &cond : conds) {
+            auto lhs_col_meta = get_col(cols_, cond.lhs_col);
+            char *lhs_data = record->data + lhs_col_meta->offset;
+            if (cond.is_rhs_val) {
+                // 右边是常量值
+                if (!eval_condition(lhs_data, lhs_col_meta->type, cond.op, cond.rhs_val)) {
+                    return false;
+                }
+            } else {
+                // 右边是列
+                auto rhs_col_meta = get_col(cols_, cond.rhs_col);
+                char *rhs_data = record->data + rhs_col_meta->offset;
+                if (!eval_condition(lhs_data, lhs_col_meta->type, cond.op, rhs_data, rhs_col_meta->type)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+    // 评估条件（左值 vs 右值）
+    bool eval_condition(const char *lhs_data, ColType lhs_type, CompOp op, const Value &rhs_val) {
+        switch (lhs_type) {
+            case TYPE_INT:
+                return eval_condition(*(int *)lhs_data, op, rhs_val.int_val);
+            case TYPE_FLOAT:
+                return eval_condition(*(float *)lhs_data, op, rhs_val.float_val);
+            case TYPE_STRING:
+                return eval_condition(std::string(lhs_data, rhs_val.str_val.size()), op, rhs_val.str_val);
+            default:
+                return false;
+        }
+    }
+    // 评估条件（列左值 vs 列右值）
+    bool eval_condition(const char *lhs_data, ColType lhs_type, CompOp op, const char *rhs_data, ColType rhs_type) {
+        //检查两列数据类型是否一致
+        if (lhs_type != rhs_type) {
+            throw IncompatibleTypeError(coltype2str(lhs_type), coltype2str(rhs_type));
+        }
+        switch (lhs_type) {
+            case TYPE_INT:
+                return eval_condition(*(int *)lhs_data, op, *(int *)rhs_data);
+            case TYPE_FLOAT:
+                return eval_condition(*(float *)lhs_data, op, *(float *)rhs_data);
+            case TYPE_STRING:
+                return eval_condition(std::string(lhs_data), op, std::string(rhs_data));
+            default:
+                return false;
+        }
+    }
+    // 评估条件（左值 vs 右值）
+    template <typename T>
+    bool eval_condition(T lhs, CompOp op, T rhs) {
+        switch (op) {
+            case OP_EQ:
+                return lhs == rhs;
+            case OP_NE:
+                return lhs != rhs;
+            case OP_LT:
+                return lhs < rhs;
+            case OP_LE:
+                return lhs <= rhs;
+            case OP_GT:
+                return lhs > rhs;
+            case OP_GE:
+                return lhs >= rhs;
+            default:
+                return false;
+        }
+    }
 };

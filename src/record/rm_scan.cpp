@@ -83,3 +83,4 @@ bool RmScan::is_end() const {
 Rid RmScan::rid() const {
     return rid_;
 }
+
