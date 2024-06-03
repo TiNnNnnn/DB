@@ -161,7 +161,8 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
     
     // print header into file (将表头信息写入output.txt)
     std::fstream outfile;
-    outfile.open("output.txt", std::ios::out | std::ios::app);
+    std::string out_file_name = sm_manager_->get_db_name() + "/output.txt";
+    outfile.open(out_file_name, std::ios::out | std::ios::app);
     outfile << "|";
     for(int i = 0; i < captions.size(); ++i) {
         outfile << " " << captions[i] << " |";

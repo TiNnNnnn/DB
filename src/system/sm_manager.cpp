@@ -314,6 +314,9 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
         throw UnixError();
     }
     if (!db_.is_table(tab_name)) {
+        if (chdir("..") < 0) {
+            throw UnixError();
+        }
         throw TableNotFoundError(tab_name);
     }
     //check if index has exsit

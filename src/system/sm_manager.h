@@ -52,6 +52,8 @@ class SmManager {
 
     IxManager* get_ix_manager() { return ix_manager_; }  
 
+    std::string get_db_name(){return db_.name_;}
+
     bool is_dir(const std::string& db_name);
 
     void create_db(const std::string& db_name);
