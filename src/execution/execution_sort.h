@@ -41,6 +41,14 @@ class SortExecutor : public AbstractExecutor {
         
     }
 
+    virtual const std::vector<ColMeta> &cols() const{
+
+    }
+    
+    virtual bool is_end() const{
+        
+    }
+
     std::unique_ptr<RmRecord> Next() override {
         return nullptr;
     }

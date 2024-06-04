@@ -53,10 +53,8 @@ class ProjectionExecutor : public AbstractExecutor {
         if (!record) {
             return nullptr; // 如果上一个节点没有下一个记录，则返回空指针
         }
-
         // 创建一个新的记录
         auto projected_record = std::make_unique<RmRecord>(len_);
-
         // 从上一个记录中复制需要投影的字段到新记录中
         for (size_t i = 0; i < sel_idxs_.size(); ++i) {
             auto idx = sel_idxs_[i]; // 获取需要投影的字段的索引
@@ -67,6 +65,14 @@ class ProjectionExecutor : public AbstractExecutor {
         }
 
         return projected_record;
+    }
+
+    const std::vector<ColMeta> &cols() const override{
+       return cols_;
+    };
+
+    bool is_end() const override{
+        return prev_->is_end();
     }
 
     Rid &rid() override { return _abstract_rid; }

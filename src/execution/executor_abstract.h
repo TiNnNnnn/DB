@@ -36,7 +36,9 @@ class AbstractExecutor {
 
     virtual void nextTuple(){};
 
-    virtual bool is_end() const { return true; };
+    virtual bool is_end() const{
+        return true;
+    }
 
     virtual Rid &rid() = 0;
 

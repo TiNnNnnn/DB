@@ -50,7 +50,7 @@ void RmScan::next() {
         RmPageHandle page_handle = file_handle_->fetch_page_handle(page_no);
 
         // 遍历槽位
-        int start_slot_no = (page_no == start_page) ? start_slot + 1 : 0;
+        int start_slot_no = (page_no == start_page) ? start_slot+1 : 0;
         for (int slot_no = start_slot_no; slot_no < file_hdr.num_records_per_page; ++slot_no) {
             // 检查是否存在记录
             if (Bitmap::is_set(page_handle.bitmap, slot_no)) {

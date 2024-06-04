@@ -55,5 +55,7 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
         return nullptr;
     }
 
+    
+
     Rid &rid() override { return _abstract_rid; }
 };

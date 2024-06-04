@@ -49,12 +49,20 @@ class SeqScanExecutor : public AbstractExecutor {
 
     //找到第一条符合条件的记录
     void beginTuple() override {
-        scan_->next(); // 移动到第一个记录
-        nextTuple();
+        while (!scan_->is_end()) {
+            rid_ = scan_->rid();
+            auto record = fh_->get_record(rid_,nullptr);
+            // 检查记录是否符合条件
+            if (match_conditions(record.get(), fed_conds_)) {
+                return;
+            }
+            scan_->next();
+        }
     }
 
     //找到下一个符合条件的记录
     void nextTuple() override {
+        scan_->next();
         while (!scan_->is_end()) {
             rid_ = scan_->rid();
             auto record = fh_->get_record(rid_,nullptr);
@@ -72,7 +80,6 @@ class SeqScanExecutor : public AbstractExecutor {
             return nullptr;
         }
         auto record = fh_->get_record(rid_,nullptr);
-        nextTuple(); // 为下一个调用做准备
         return record;
     }
 
@@ -85,6 +92,14 @@ class SeqScanExecutor : public AbstractExecutor {
     size_t tupleLen() const override {
         return len_;
     }
+
+    std::string getType() override{
+        return "SeqScanExecutor";
+    }
+
+    virtual bool is_end() const { 
+        return scan_->is_end();
+    };
 
      // 检查记录是否符合条件
     bool match_conditions(const RmRecord *record, const std::vector<Condition> &conds) {

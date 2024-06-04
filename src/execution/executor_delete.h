@@ -61,4 +61,6 @@ class DeleteExecutor : public AbstractExecutor {
     }
 
     Rid &rid() override { return _abstract_rid; }
+
+    
 };
