@@ -182,8 +182,9 @@ void SmManager::show_tables(Context* context) {
         printer.print_record({tab.name}, context);
         outfile << "| " << tab.name << " |\n";
     }
-    outfile << "\n";
-    
+
+    outfile <<"csdcsdcsdcvsdcsdcsd";
+
     printer.print_separator(context);
     outfile.close();
 
