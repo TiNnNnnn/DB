@@ -176,12 +176,15 @@ void SmManager::show_tables(Context* context) {
     printer.print_separator(context);
     printer.print_record({"Tables"}, context);
     printer.print_separator(context);
+
     for (auto &entry : db_.tabs_) {
         auto &tab = entry.second;
         printer.print_record({tab.name}, context);
         outfile << "| " << tab.name << " |\n";
     }
-    //printer.print_separator(context);
+    outfile << "\n";
+    
+    printer.print_separator(context);
     outfile.close();
 
     if (chdir("..") < 0) {
