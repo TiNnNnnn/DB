@@ -49,6 +49,7 @@ class SeqScanExecutor : public AbstractExecutor {
 
     //找到第一条符合条件的记录
     void beginTuple() override {
+        scan_ = std::make_unique<RmScan>(fh_);
         while (!scan_->is_end()) {
             rid_ = scan_->rid();
             auto record = fh_->get_record(rid_,nullptr);

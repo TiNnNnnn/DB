@@ -80,6 +80,86 @@ struct Condition {
     bool is_rhs_val;  // true if right-hand side is a value (not a column)
     TabCol rhs_col;   // right-hand side column
     Value rhs_val;    // right-hand side value
+
+    // 检查条件是否满足
+    // bool isSatisfied(const std::unique_ptr<RmRecord> &left, const std::unique_ptr<RmRecord> &right) const {
+    //     const char* lhs_data = left->data + lhs_col.offset;
+    //     const char* rhs_data;
+
+    //     if (is_rhs_val) {
+    //         // 右侧是常量值
+    //         rhs_data = reinterpret_cast<const char*>(&rhs_val);
+    //     } else {
+    //         // 右侧是列值
+    //         rhs_data = right->data + rhs_val.offset;
+    //     }
+
+    //     // 根据数据类型进行比较
+    //     switch (rhs_val.type) {
+    //         case TYPE_INT: {
+    //             int lhs_value = *reinterpret_cast<const int*>(lhs_data);
+    //             int rhs_value = is_rhs_val ? rhs_val.int_val : *reinterpret_cast<const int*>(rhs_data);
+
+    //             switch (op) {
+    //                 case OP_EQ:
+    //                     return lhs_value == rhs_value;
+    //                 case OP_NE:
+    //                     return lhs_value != rhs_value;
+    //                 case OP_LT:
+    //                     return lhs_value < rhs_value;
+    //                 case OP_LE:
+    //                     return lhs_value <= rhs_value;
+    //                 case OP_GT:
+    //                     return lhs_value > rhs_value;
+    //                 case OP_GE:
+    //                     return lhs_value >= rhs_value;
+    //             }
+    //             break;
+    //         }
+    //         case TYPE_FLOAT: {
+    //             float lhs_value = *reinterpret_cast<const float*>(lhs_data);
+    //             float rhs_value = is_rhs_val ? rhs_val.float_val : *reinterpret_cast<const float*>(rhs_data);
+
+    //             switch (op) {
+    //                 case OP_EQ:
+    //                     return lhs_value == rhs_value;
+    //                 case OP_NE:
+    //                     return lhs_value != rhs_value;
+    //                 case OP_LT:
+    //                     return lhs_value < rhs_value;
+    //                 case OP_LE:
+    //                     return lhs_value <= rhs_value;
+    //                 case OP_GT:
+    //                     return lhs_value > rhs_value;
+    //                 case OP_GE:
+    //                     return lhs_value >= rhs_value;
+    //             }
+    //             break;
+    //         }
+    //         case TYPE_STRING: {
+    //             std::string lhs_value(lhs_data);
+    //             std::string rhs_value = is_rhs_val ? rhs_val.str_val : std::string(rhs_data);
+
+    //             switch (op) {
+    //                 case OP_EQ:
+    //                     return lhs_value == rhs_value;
+    //                 case OP_NE:
+    //                     return lhs_value != rhs_value;
+    //                 case OP_LT:
+    //                     return lhs_value < rhs_value;
+    //                 case OP_LE:
+    //                     return lhs_value <= rhs_value;
+    //                 case OP_GT:
+    //                     return lhs_value > rhs_value;
+    //                 case OP_GE:
+    //                     return lhs_value >= rhs_value;
+    //             }
+    //             break;
+    //         }
+    //     }
+
+    //     return false; // 不支持的数据类型
+    // }
 };
 
 struct SetClause {

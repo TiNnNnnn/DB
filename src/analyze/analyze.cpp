@@ -59,8 +59,17 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
         }
         // 处理set子句
         for (auto &sv_set_clause : x->set_clauses) {
+            Value sv_value = convert_sv_value(sv_set_clause->val);
+            if(sm_manager_->db_.get_table(x->tab_name).get_col(
+                sv_set_clause->col_name)->type == TYPE_FLOAT){
+                if(sv_value.type == TYPE_INT){
+                    sv_value.type = TYPE_FLOAT;
+                    sv_value.float_val = (float)sv_value.int_val;
+                }
+            }
             SetClause set_clause = {
-                {x->tab_name,sv_set_clause->col_name},convert_sv_value(sv_set_clause->val)};
+                {x->tab_name,sv_set_clause->col_name},sv_value
+            };
             query->set_clauses.push_back(set_clause);
         }
         // 检查更新的列是否存在

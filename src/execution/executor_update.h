@@ -67,6 +67,7 @@ class UpdateExecutor : public AbstractExecutor {
                 }
                 (set_clause.rhs).init_raw(col.len);
                 memcpy(rec->data + col.offset, set_clause.rhs.raw->data, col.len);
+                set_clause.rhs.raw.reset();
             }
 
             // 删除原索引项
