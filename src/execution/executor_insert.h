@@ -23,6 +23,7 @@ class InsertExecutor : public AbstractExecutor {
     std::string tab_name_;          // 表名称
     Rid rid_;                       // 插入的位置，由于系统默认插入时不指定位置，因此当前rid_在插入后才赋值
     SmManager *sm_manager_;
+    std::unique_ptr<RecScan> scan_;     // table_iterator
 
    public:
     InsertExecutor(SmManager *sm_manager, const std::string &tab_name, std::vector<Value> values, Context *context) {
@@ -49,6 +50,18 @@ class InsertExecutor : public AbstractExecutor {
             val.init_raw(col.len);
             memcpy(rec.data + col.offset, val.raw->data, col.len);
         }
+
+        //check if record has been exist
+        scan_ = std::make_unique<RmScan>(fh_);
+        while (!scan_->is_end()) {
+            rid_ = scan_->rid();
+            auto record = fh_->get_record(rid_,nullptr);
+            if(memcmp(rec.data,record->data,record->size) == 0 && record->size == rec.size){
+                return nullptr;
+            }
+            scan_->next();
+        }
+
         // Insert into record file
         rid_ = fh_->insert_record(rec.data, context_);
         

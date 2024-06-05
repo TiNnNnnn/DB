@@ -1,9 +1,16 @@
 test
-2
+3
 d
 2
 d d_name 2 5 0 0
 d id 0 4 5 0
+0
+
+grade
+3
+grade name 2 20 0 0
+grade id 0 4 20 0
+grade score 1 4 24 0
 0
 
 t
