@@ -17,6 +17,7 @@ enum class Operation { FIND = 0, INSERT, DELETE };  // 三种操作：查找、�
 
 static const bool binary_search = false;
 
+//索引比较
 inline int ix_compare(const char *a, const char *b, ColType type, int col_len) {
     switch (type) {
         case TYPE_INT: {
@@ -35,7 +36,7 @@ inline int ix_compare(const char *a, const char *b, ColType type, int col_len) {
             throw InternalError("Unexpected data type");
     }
 }
-
+//复合索引比较
 inline int ix_compare(const char* a, const char* b, const std::vector<ColType>& col_types, const std::vector<int>& col_lens) {
     int offset = 0;
     for(size_t i = 0; i < col_types.size(); ++i) {
@@ -47,6 +48,8 @@ inline int ix_compare(const char* a, const char* b, const std::vector<ColType>& 
 }
 
 /* 管理B+树中的每个节点 */
+
+//B+Tree Node
 class IxNodeHandle {
     friend class IxIndexHandle;
     friend class IxScan;
@@ -57,7 +60,7 @@ class IxNodeHandle {
     IxPageHdr *page_hdr;            // page->data的第一部分，指针指向首地址，长度为sizeof(IxPageHdr)
     char *keys;                     // page->data的第二部分，指针指向首地址，长度为file_hdr->keys_size，每个key的长度为file_hdr->col_len
     Rid *rids;                      // page->data的第三部分，指针指向首地址
-
+    std::mutex node_mutex_;
    public:
     IxNodeHandle() = default;
 
@@ -155,6 +158,14 @@ class IxNodeHandle {
         assert(rid_idx < page_hdr->num_key);
         return rid_idx;
     }
+
+    void latch() {
+        node_mutex_.lock();
+    }
+
+    void unlatch() {
+        node_mutex_.unlock();
+    }
 };
 
 /* B+树 */
@@ -227,4 +238,7 @@ class IxIndexHandle {
 
     // for index test
     Rid get_rid(const Iid &iid) const;
+
+    
+    
 };

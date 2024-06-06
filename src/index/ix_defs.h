@@ -54,7 +54,8 @@ public:
         tot_len_ += sizeof(page_id_t) * 4 + sizeof(int) * 6;
         tot_len_ += sizeof(ColType) * col_num_ + sizeof(int) * col_num_;
     }
-
+    
+    //将文件头部信息序列化为字符数组
     void serialize(char* dest) {
         int offset = 0;
         memcpy(dest + offset, &tot_len_, sizeof(int));
@@ -88,6 +89,7 @@ public:
         assert(offset == tot_len_);
     }
 
+    //从字符数组反序列化文件头部信息
     void deserialize(char* src) {
         int offset = 0;
         tot_len_ = *reinterpret_cast<const int*>(src + offset);
