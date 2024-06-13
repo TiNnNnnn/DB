@@ -36,7 +36,7 @@ inline int ix_compare(const char *a, const char *b, ColType type, int col_len) {
             throw InternalError("Unexpected data type");
     }
 }
-//复合索引比较
+//复合索引比较 (最左匹配)
 inline int ix_compare(const char* a, const char* b, const std::vector<ColType>& col_types, const std::vector<int>& col_lens) {
     int offset = 0;
     for(size_t i = 0; i < col_types.size(); ++i) {
@@ -48,7 +48,6 @@ inline int ix_compare(const char* a, const char* b, const std::vector<ColType>& 
 }
 
 /* 管理B+树中的每个节点 */
-
 //B+Tree Node
 class IxNodeHandle {
     friend class IxIndexHandle;
@@ -57,6 +56,7 @@ class IxNodeHandle {
    private:
     const IxFileHdr *file_hdr;      // 节点所在文件的头部信息
     Page *page;                     // 存储节点的页面
+
     IxPageHdr *page_hdr;            // page->data的第一部分，指针指向首地址，长度为sizeof(IxPageHdr)
     char *keys;                     // page->data的第二部分，指针指向首地址，长度为file_hdr->keys_size，每个key的长度为file_hdr->col_len
     Rid *rids;                      // page->data的第三部分，指针指向首地址
@@ -176,7 +176,7 @@ class IxIndexHandle {
    private:
     DiskManager *disk_manager_;
     BufferPoolManager *buffer_pool_manager_;
-    int fd_;                                    // 存储B+树的文件
+    int fd_;                                    // 存储B+树的文件 (tab索引文件)
     IxFileHdr* file_hdr_;                       // 存了root_page，但其初始化为2（第0页存FILE_HDR_PAGE，第1页存LEAF_HEADER_PAGE）
     std::mutex root_latch_;
 

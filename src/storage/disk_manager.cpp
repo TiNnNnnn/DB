@@ -157,9 +157,6 @@ void DiskManager::destroy_file(const std::string &path) {
         }
         
     }
-
-    
-
 }
 
 /**

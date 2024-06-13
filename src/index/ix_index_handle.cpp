@@ -9,7 +9,6 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 #include "ix_index_handle.h"
-
 #include "ix_scan.h"
 
 /**
@@ -19,17 +18,11 @@ See the Mulan PSL v2 for more details. */
  * @note 返回key index（同时也是rid index），作为slot no
  */
 int IxNodeHandle::lower_bound(const char *target) const {
-    // Todo:
-    // 查找当前节点中第一个大于等于target的key，并返回key的位置给上层
-    // 提示: 可以采用多种查找方式，如顺序遍历、二分查找等；使用ix_compare()函数进行比较
     int left = 0;
-    int right = page_hdr->num_key; // num_key的值
-
-    // 二分查找，寻找第一个大于等于target的key的位置
+    int right = page_hdr->num_key;
     while (left < right) {
         int mid = left + (right - left) / 2;
         int cmp = ix_compare(get_key(mid), target, file_hdr->col_types_, file_hdr->col_lens_);
-
         if (cmp < 0) {
             left = mid + 1; // 继续在右半部分查找
         } else {
@@ -46,21 +39,15 @@ int IxNodeHandle::lower_bound(const char *target) const {
  * @note 注意此处的范围从1开始
  */
 int IxNodeHandle::upper_bound(const char *target) const {
-    // Todo:
-    // 查找当前节点中第一个大于target的key，并返回key的位置给上层
-    // 提示: 可以采用多种查找方式：顺序遍历、二分查找等；使用ix_compare()函数进行比较
     int left = 1;
     int right = page_hdr->num_key;
-
-    // 二分查找，寻找第一个大于target的key的位置
     while (left < right) {
         int mid = left + (right - left) / 2;
         int cmp = ix_compare(get_key(mid), target, file_hdr->col_types_, file_hdr->col_lens_);
-
         if (cmp <= 0) {
-            left = mid + 1; // 继续在右半部分查找
+            left = mid + 1;
         } else {
-            right = mid; // 继续在左半部分查找
+            right = mid;
         }
     }
     return left;
@@ -81,12 +68,8 @@ bool IxNodeHandle::leaf_lookup(const char *key, Rid **value) {
     // 3. 如果存在，获取key对应的Rid，并赋值给传出参数value
     // 提示：可以调用lower_bound()和get_rid()函数。
 
-    // 1. 在叶子节点中获取目标key所在位置
     int idx = lower_bound(key);
-
-    // 2. 判断目标key是否存在
     if (idx < get_size() && ix_compare(get_key(idx), key, file_hdr->col_types_, file_hdr->col_lens_) == 0) {
-        // 3. 如果存在，获取key对应的Rid，并赋值给传出参数value
         *value = get_rid(idx);
         return true;
     }
@@ -107,13 +90,11 @@ page_id_t IxNodeHandle::internal_lookup(const char *key) {
 
     // 1. 查找当前非叶子节点中目标key所在孩子节点（子树）的位置
     int idx = lower_bound(key);
-
     // 2. 如果idx等于当前节点的键数，表示目标key大于当前节点所有键
     if (idx == get_size()) {
         // 目标key在最后一个孩子节点
         return value_at(idx);
     }
-    // 3. 返回子节点的页面编号
     return value_at(idx);
 }
 
@@ -172,20 +153,13 @@ int IxNodeHandle::insert(const char *key, const Rid &value) {
     // 2. 如果key重复则不插入
     // 3. 如果key不重复则插入键值对
     // 4. 返回完成插入操作之后的键值对数量
-     // 1. 查找要插入的键值对应该插入到当前节点的哪个位置
+
     int pos = lower_bound(key);
-    // 2. 如果key重复则不插入
     if (pos < get_size() && ix_compare(get_key(pos), key, file_hdr->col_types_,file_hdr->col_lens_) == 0) {
-        // key已存在，返回当前键值对数量
         return get_size();
     }
-    // 3. 如果key不重复则插入键值对
     insert_pairs(pos, key, &value, 1);
-
-    // 4. 返回完成插入操作之后的键值对数量
     return get_size();
-
-    return -1;
 }
 
 /**
@@ -199,19 +173,16 @@ void IxNodeHandle::erase_pair(int pos) {
     // 2. 删除该位置的rid
     // 3. 更新结点的键值对数量
     
-    // 1. 删除该位置的key
-    // 将从pos+1开始的所有key向前移动一位，覆盖pos位置的key
+    // 1. 删除该位置的key，将从pos+1开始的所有key向前移动一位，覆盖pos位置的key
     memmove(keys + pos * file_hdr->col_tot_len_,
             keys + (pos + 1) * file_hdr->col_tot_len_,
             (get_size() - pos - 1) * file_hdr->col_tot_len_);
 
-    // 2. 删除该位置的rid
-    // 将从pos+1开始的所有rid向前移动一位，覆盖pos位置的rid
+    // 2. 删除该位置的rid，将从pos+1开始的所有rid向前移动一位，覆盖pos位置的rid
     memmove(rids + pos,
             rids + (pos + 1),
             (get_size() - pos - 1) * sizeof(Rid));
 
-    // 3. 更新结点的键值对数量
     set_size(get_size() - 1);
 }
 
@@ -226,21 +197,18 @@ int IxNodeHandle::remove(const char *key) {
     // 1. 查找要删除键值对的位置
     // 2. 如果要删除的键值对存在，删除键值对
     // 3. 返回完成删除操作后的键值对数量
-
-    // 1. 查找要删除键值对的位置
     int pos = lower_bound(key);
-    // 2. 如果要删除的键值对存在，删除键值对
     if (pos < get_size() && ix_compare(get_key(pos), key, file_hdr->col_types_, file_hdr->col_lens_) == 0) {
         erase_pair(pos);
     }
-    // 3. 返回完成删除操作后的键值对数量
     return get_size();
 }
 
+//构造IxIndexHandle
 IxIndexHandle::IxIndexHandle(DiskManager *disk_manager, BufferPoolManager *buffer_pool_manager, int fd)
     : disk_manager_(disk_manager), buffer_pool_manager_(buffer_pool_manager), fd_(fd) {
     // init file_hdr_
-    disk_manager_->read_page(fd, IX_FILE_HDR_PAGE, (char *)&file_hdr_, sizeof(file_hdr_));
+    //disk_manager_->read_page(fd, IX_FILE_HDR_PAGE, (char *)&file_hdr_, sizeof(file_hdr_));
     char* buf = new char[PAGE_SIZE];
     memset(buf, 0, PAGE_SIZE);
     disk_manager_->read_page(fd, IX_FILE_HDR_PAGE, buf, PAGE_SIZE);
@@ -254,13 +222,15 @@ IxIndexHandle::IxIndexHandle(DiskManager *disk_manager, BufferPoolManager *buffe
     disk_manager_->set_fd2pageno(fd, now_page_no + 1);
 }
 
+
+//TODO: 06.11 根据operation指定不同的加锁策略，现在只适合FIND
 /**
  * @brief 用于查找指定键所在的叶子结点
  * @param key 要查找的目标key值
  * @param operation 查找到目标键值对后要进行的操作类型
  * @param transaction 事务参数，如果不需要则默认传入nullptr
  * @return [leaf node] and [root_is_latched] 返回目标叶子结点以及根结点是否加锁
- * @note need to Unlatch and unpin the leaf node outside!
+ * ######@note need to Unlatch and unpin the leaf node outside!
  * 注意：用了FindLeafPage之后一定要unlatch叶结点，否则下次latch该结点会堵塞！
  */
 std::pair<IxNodeHandle *, bool> IxIndexHandle::find_leaf_page(const char *key, Operation operation,
@@ -269,14 +239,15 @@ std::pair<IxNodeHandle *, bool> IxIndexHandle::find_leaf_page(const char *key, O
     // 1. 获取根节点
     // 2. 从根节点开始不断向下查找目标key
     // 3. 找到包含该key值的叶子结点停止查找，并返回叶子节点
-    
+
     bool root_is_latched = false;
     // 1. 获取根节点
     page_id_t root_page_id = file_hdr_->root_page_;
     IxNodeHandle *current_node = fetch_node(root_page_id);
     current_node->latch(); // 加锁当前节点
     root_is_latched = true; // 根节点已加锁
-    
+
+    auto root_node = current_node;
     // 2. 从根节点开始不断向下查找目标key
     while (!current_node->is_leaf_page()) {
         // 当前节点不是叶子节点，需要继续向下查找
@@ -284,21 +255,17 @@ std::pair<IxNodeHandle *, bool> IxIndexHandle::find_leaf_page(const char *key, O
         page_id_t child_page_id = current_node->internal_lookup(key);
         // 获取下一个节点
         IxNodeHandle *next_node = fetch_node(child_page_id);
-        next_node->latch(); // 加锁下一个节点
-
+         // 加锁下一个节点
+        next_node->latch();
         // unlatch当前节点
         current_node->unlatch();
+        if(current_node == root_node)root_is_latched = true;
         current_node = next_node;
     }
-
-    if (!current_node->is_leaf_page()) {
-        current_node->unlatch();
-    }
-    
-    
     // 3. 返回叶子节点和根节点是否加锁的信息
     return std::make_pair(current_node, root_is_latched);
 }
+
 
 /**
  * @brief 用于查找指定键在叶子结点中的对应的值result
@@ -329,12 +296,12 @@ bool IxIndexHandle::get_value(const char *key, std::vector<Rid> *result, Transac
             result->push_back(*value);
         }
     }
+    buffer_pool_manager_->unpin_page(leaf_node->get_page_id(),true);
 
     // 3. 解锁根节点（如果已经加锁）
     if (root_is_latched) {
         root_latch_.unlock();
     }
-
     // unlatch叶子节点
     leaf_node->unlatch();
 
@@ -362,7 +329,6 @@ IxNodeHandle *IxIndexHandle::split(IxNodeHandle *node) {
     IxNodeHandle *new_node = new IxNodeHandle(file_hdr_, new_page);
 
     int mid_idx = node->get_size() / 2;
-
     if (node->is_leaf_page()) {// 如果要拆分的节点是叶子节点
         // 复制数据
         for (int i = mid_idx; i < node->get_size(); ++i) {
@@ -371,7 +337,6 @@ IxNodeHandle *IxIndexHandle::split(IxNodeHandle *node) {
         // 更新新节点的叶子节点链表指针
         new_node->set_next_leaf(node->get_next_leaf());
         new_node->set_prev_leaf(node->get_page_no());
-
         // 更新原节点的叶子节点链表指针和键值对数量
         node->set_next_leaf(new_node->get_page_no());
         node->set_size(mid_idx);

@@ -47,7 +47,7 @@ struct IndexMeta {
     int col_tot_len;                // 索引字段长度总和
     int col_num;                    // 索引字段数量
     std::vector<ColMeta> cols;      // 索引包含的字段
-
+    
     friend std::ostream &operator<<(std::ostream &os, const IndexMeta &index) {
         os << index.tab_name << " " << index.col_tot_len << " " << index.col_num;
         for(auto& col: index.cols) {
@@ -100,10 +100,10 @@ struct TabMeta {
                 if(i == index.col_num) return true;
             }
         }
-
         return false;
     }
 
+   
     /* 判断当前表上是否建有指定索引，索引包含的字段为col_names */
     bool is_index(const std::vector<ColMeta>& col_names) const {
         for(auto& index: indexes) {

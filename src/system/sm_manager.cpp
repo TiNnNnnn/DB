@@ -323,7 +323,7 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
     }
     //check if index has exsit
     auto& tab_meta = db_.get_table(tab_name);
-    if(!tab_meta.is_index(col_names)){
+    if(tab_meta.is_index(col_names)){
         throw IndexExistsError(tab_name, col_names);
     }
     //check if col exist in table
@@ -339,18 +339,19 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
     for(auto col_name : col_names){
         ColMeta col_meta = *(tab_meta.get_col(col_name));
         col_total_size+=col_meta.len;
-        cols.push_back(col_meta);
         col_meta.index = true;
+        (tab_meta.get_col(col_name))->index = true;
+        cols.push_back(col_meta);
     }
     ix_manager_->create_index(tab_name,cols);
 
     //flush meta
     IndexMeta idx_meta{tab_name,col_total_size,col_num,cols};
     std::string index_name = ix_manager_->get_index_name(tab_name, cols);
-
+    
     tab_meta.indexes.push_back(idx_meta);
     ihs_[index_name] = ix_manager_->open_index(tab_name, cols);
-
+  
     flush_meta();
 
     // 回到根目录
@@ -366,7 +367,6 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
  * @param {Context*} context
  */
 void SmManager::drop_index(const std::string& tab_name, const std::vector<std::string>& col_names, Context* context) {
-    // 1. 验证表的存在性
     if (!is_dir(db_.name_)) {
         throw DatabaseNotFoundError(db_.name_);
     }
@@ -383,28 +383,37 @@ void SmManager::drop_index(const std::string& tab_name, const std::vector<std::s
     //验证索引是否存在
     auto& tab_meta = db_.get_table(tab_name);
     if(!tab_meta.is_index(col_names)){
-        throw IndexExistsError(tab_name, col_names);
+        throw IndexNotFoundError(tab_name,col_names);
     }
 
     //删除索引
     std::string ix_name = ix_manager_->get_index_name(tab_name, col_names);
-    ix_manager_->destroy_index(ix_name,col_names);
+    disk_manager_->close_file(disk_manager_->get_file_fd(ix_name));
+    ix_manager_->destroy_index(tab_name,col_names);
 
     //删除索引元数据
-    //build index
     int col_num = col_names.size();
     int col_total_size = 0;
     std::vector<ColMeta>cols;
     for(auto col_name : col_names){
         ColMeta col_meta = *(tab_meta.get_col(col_name));
-        col_total_size+=col_meta.len;
+        col_total_size+=col_meta.len; 
+        col_meta.index = false;
+        (tab_meta.get_col(col_name))->index = false; //TODO06-13: fix 
         cols.push_back(col_meta);
-        col_meta.index = true;
+       
     }
     IndexMeta idx_meta{tab_name,col_total_size,col_num,cols};
 
     auto index_it = std::find_if(tab_meta.indexes.begin(), tab_meta.indexes.end(), [&](const IndexMeta& index) {
-        return  index.tab_name == tab_name, index.col_num == col_num && index.col_tot_len == col_total_size && index.cols == cols;
+        bool left = index.tab_name == tab_name&&index.col_num == col_num && index.col_tot_len == col_total_size;
+        if(!left)return false;
+
+        size_t i = 0;
+        for(; i < index.col_num; ++i) {
+            if(index.cols[i].name.compare(cols[i].name) != 0)return false;
+        }
+        return true;
     });
      
     tab_meta.indexes.erase(index_it);
@@ -431,4 +440,40 @@ void SmManager::drop_index(const std::string& tab_name, const std::vector<ColMet
         str_cols.push_back(col.name);
     }
     drop_index(tab_name,str_cols,context);
+}
+
+void SmManager::show_indexs(const std::string& tab_name,Context* context) {
+    if (!is_dir(db_.name_)) {
+        throw DatabaseNotFoundError(db_.name_);
+    }
+    if (chdir(db_.name_.c_str()) < 0) {  // 进入数据库目录
+        throw UnixError();
+    }
+
+    std::fstream outfile;
+    outfile.open("output.txt", std::ios::out | std::ios::app);
+    RecordPrinter printer(3);
+    printer.print_separator(context);
+
+    TabMeta &tab = db_.get_table(tab_name);
+    for (auto & entry : tab.indexes){
+        std::string name_list = "(";
+        for(auto &col_meta : entry.cols){
+            auto name = col_meta.name;
+            name_list += name;
+            name_list += ",";
+        }
+        name_list.pop_back();
+        name_list+=")";
+
+        printer.print_record({tab.name,"unique",name_list}, context);
+        outfile << "| " << tab.name << " | unique | "<< name_list <<" |\n";
+    }
+
+    printer.print_separator(context);
+    outfile.close();
+
+    if (chdir("..") < 0) {
+        throw UnixError();
+    }
 }
