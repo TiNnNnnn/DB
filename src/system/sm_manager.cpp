@@ -172,6 +172,7 @@ void SmManager::show_tables(Context* context) {
     std::fstream outfile;
     outfile.open("output.txt", std::ios::out | std::ios::app);
     outfile << "| Tables |\n";
+    
     RecordPrinter printer(1);
     printer.print_separator(context);
     printer.print_record({"Tables"}, context);
@@ -228,6 +229,9 @@ void SmManager::create_table(const std::string& tab_name, const std::vector<ColD
         throw UnixError();
     }
     if (db_.is_table(tab_name)) {
+        if (chdir("..") < 0) {
+            throw UnixError();
+        }
         throw TableExistsError(tab_name);
     }
     // Create table meta
@@ -274,8 +278,8 @@ void SmManager::drop_table(const std::string& tab_name, Context* context) {
     }
     if (!db_.is_table(tab_name)) {
         if (chdir("..") < 0) {
-        throw UnixError();
-    }
+            throw UnixError();
+        }
         throw TableNotFoundError(tab_name);
     }
     
