@@ -183,6 +183,10 @@ class IxIndexHandle {
    public:
     IxIndexHandle(DiskManager *disk_manager, BufferPoolManager *buffer_pool_manager, int fd);
 
+    IxFileHdr* get_file_hdr(){
+        return file_hdr_;
+    }
+
     // for search
     bool get_value(const char *key, std::vector<Rid> *result, Transaction *transaction);
 
@@ -215,15 +219,15 @@ class IxIndexHandle {
     Iid leaf_end() const;
 
     Iid leaf_begin() const;
-
+    // for get/create node
+    IxNodeHandle *fetch_node(int page_no) const;
    private:
     // 辅助函数
     void update_root_page_no(page_id_t root) { file_hdr_->root_page_ = root; }
 
     bool is_empty() const { return file_hdr_->root_page_ == IX_NO_PAGE; }
 
-    // for get/create node
-    IxNodeHandle *fetch_node(int page_no) const;
+   
 
     IxNodeHandle *create_node();
 

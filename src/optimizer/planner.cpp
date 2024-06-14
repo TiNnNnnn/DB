@@ -23,19 +23,73 @@ See the Mulan PSL v2 for more details. */
 #include "record_printer.h"
 
 // 目前的索引匹配规则为：完全匹配索引字段，且全部为单点查询，不会自动调整where条件的顺序
-bool Planner::get_index_cols(std::string tab_name, std::vector<Condition> curr_conds, std::vector<std::string>& index_col_names) {
-    index_col_names.clear();
-    for(auto& cond: curr_conds) {
-        if(cond.is_rhs_val && cond.op == OP_EQ && cond.lhs_col.tab_name.compare(tab_name) == 0)
-            index_col_names.push_back(cond.lhs_col.col_name);
+bool Planner::get_index_cols(std::shared_ptr<Query> query,std::string tab_name, std::vector<Condition> curr_conds, std::vector<std::string>& index_col_names) {
+   index_col_names.clear();
+
+    // 获取表元数据
+    auto& tab_meta = sm_manager_->db_.get_table(tab_name);
+    auto& tab_idxs = tab_meta.indexes;
+
+    // 使用哈希表记录列名到条件的映射
+    std::unordered_map<std::string, Condition> col_to_cond_map;
+    for (const auto& cond : curr_conds) {
+        if (cond.is_rhs_val && cond.lhs_col.tab_name == tab_name) {
+            col_to_cond_map[cond.lhs_col.col_name] = cond;
+        }
     }
-    TabMeta& tab = sm_manager_->db_.get_table(tab_name);
-    if(tab.is_index(index_col_names)) return true;
-    return false;
+
+    std::vector<std::string> best_index_cols;
+    size_t max_match_count = 0;
+
+    // 遍历所有索引，找到匹配最多条件的索引
+    for (const auto& index : tab_idxs) {
+        std::vector<std::string> matched_index_cols;
+        size_t match_count = 0;
+        bool full_match = true;
+
+        for (const auto& idx_col : index.cols) {
+            if (col_to_cond_map.find(idx_col.name) != col_to_cond_map.end()) {
+                matched_index_cols.push_back(idx_col.name);
+                match_count++;
+            } else {
+                full_match = false;
+                break;
+            }
+        }
+
+        if (match_count > max_match_count) {
+            max_match_count = match_count;
+            best_index_cols = matched_index_cols;
+
+            // 如果找到了完全匹配的索引，直接返回
+            if (full_match) {
+                index_col_names = best_index_cols;
+                return true;
+            }
+        }
+    }
+    if (best_index_cols.empty()) {
+        return false;
+    } else {
+        index_col_names = best_index_cols;
+        return true;
+    }
+   
+
+    // for(auto& cond: curr_conds) {
+    //     if(cond.is_rhs_val && cond.op == OP_EQ && cond.lhs_col.tab_name.compare(tab_name) == 0)
+    //         index_col_names.push_back(cond.lhs_col.col_name);
+    // }
+    // TabMeta& tab = sm_manager_->db_.get_table(tab_name);
+    // if(tab.is_index(index_col_names)) return true;
+    // return false;
 }
 
 /**
  * @brief 表算子条件谓词生成
+ * 
+ * 该函数从一组条件（conds）中提取与指定表名（tab_names）相关的条件。
+ * 提取出的条件会返回为一个新的条件列表（solved_conds），并从原始条件列表（conds）中移除。
  *
  * @param conds 条件
  * @param tab_names 表名
@@ -48,6 +102,7 @@ std::vector<Condition> pop_conds(std::vector<Condition> &conds, std::string tab_
     std::vector<Condition> solved_conds;
     auto it = conds.begin();
     while (it != conds.end()) {
+        // 检查条件的左侧列名是否匹配指定的表名，并且右侧是值，或者检查条件的左右两侧列名是否都属于同一张表
         if ((tab_names.compare(it->lhs_col.tab_name) == 0 && it->is_rhs_val) || (it->lhs_col.tab_name.compare(it->rhs_col.tab_name) == 0)) {
             solved_conds.emplace_back(std::move(*it));
             it = conds.erase(it);
@@ -143,13 +198,21 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
 {
     auto x = std::dynamic_pointer_cast<ast::SelectStmt>(query->parse);
     std::vector<std::string> tables = query->tables;
-    // // Scan table , 生成表算子列表tab_nodes
+    
+    // Scan table , 生成表算子列表tab_nodes
+    // 初始化一个与表数量相同的表扫描计划列表
     std::vector<std::shared_ptr<Plan>> table_scan_executors(tables.size());
+
+    // 遍历每个表，生成相应的扫描计划
     for (size_t i = 0; i < tables.size(); i++) {
+        // 从查询条件中获取当前表相关的条件
         auto curr_conds = pop_conds(query->conds, tables[i]);
         // int index_no = get_indexNo(tables[i], curr_conds);
+        // 检查是否存在索引并获取索引列名原则
         std::vector<std::string> index_col_names;
-        bool index_exist = get_index_cols(tables[i], curr_conds, index_col_names);
+        
+        //判定是否存在索引，且符合最左匹配
+        bool index_exist = get_index_cols(query,tables[i], curr_conds, index_col_names);
         if (index_exist == false) {  // 该表没有索引
             index_col_names.clear();
             table_scan_executors[i] = 
@@ -164,10 +227,11 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
     {
         return table_scan_executors[0];
     }
-    // 获取where条件
+    // 获取where条件 （join条件）
     auto conds = std::move(query->conds);
     std::shared_ptr<Plan> table_join_executors;
     
+    // 初始化一个数组来记录表是否已扫描
     int scantbl[tables.size()];
     for(size_t i = 0; i < tables.size(); i++)
     {
@@ -343,7 +407,7 @@ std::shared_ptr<Plan> Planner::do_planner(std::shared_ptr<Query> query, Context 
         // 只有一张表，不需要进行物理优化了
         // int index_no = get_indexNo(x->tab_name, query->conds);
         std::vector<std::string> index_col_names;
-        bool index_exist = get_index_cols(x->tab_name, query->conds, index_col_names);
+        bool index_exist = get_index_cols(query,x->tab_name, query->conds, index_col_names);
         
         if (index_exist == false) {  // 该表没有索引
             index_col_names.clear();
@@ -363,7 +427,7 @@ std::shared_ptr<Plan> Planner::do_planner(std::shared_ptr<Query> query, Context 
         // 只有一张表，不需要进行物理优化了
         // int index_no = get_indexNo(x->tab_name, query->conds);
         std::vector<std::string> index_col_names;
-        bool index_exist = get_index_cols(x->tab_name, query->conds, index_col_names);
+        bool index_exist = get_index_cols(query,x->tab_name, query->conds, index_col_names);
 
         if (index_exist == false) {  // 该表没有索引
         index_col_names.clear();

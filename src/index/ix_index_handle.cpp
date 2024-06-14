@@ -806,11 +806,9 @@ Rid IxIndexHandle::get_rid(const Iid &iid) const {
 Iid IxIndexHandle::lower_bound(const char *key) {
     // 找到包含key的叶子节点
     auto [leaf, is_root_latched] = find_leaf_page(key, Operation::FIND, nullptr, false);
-    
     if (leaf == nullptr) {
         return Iid{-1, -1};
     }
-
     // 在叶子节点中找到第一个大于或等于key的位置
     int slot_no = leaf->lower_bound(key);
 

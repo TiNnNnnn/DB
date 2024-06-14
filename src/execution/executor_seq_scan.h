@@ -102,7 +102,7 @@ class SeqScanExecutor : public AbstractExecutor {
         return scan_->is_end();
     };
 
-     // 检查记录是否符合条件
+    // 检查记录是否符合条件
     bool match_conditions(const RmRecord *record, const std::vector<Condition> &conds) {
         for (const auto &cond : conds) {
             auto lhs_col_meta = get_col(cols_, cond.lhs_col);

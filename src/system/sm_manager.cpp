@@ -355,8 +355,24 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
     
     tab_meta.indexes.push_back(idx_meta);
     ihs_[index_name] = ix_manager_->open_index(tab_name, cols);
-  
+    
     flush_meta();
+
+    //insert data in tables
+    auto& file_hdr = fhs_[tab_name];
+    auto scan = std::make_unique<RmScan>(file_hdr.get());
+    while(!scan->is_end()){
+        auto rid = scan->rid();
+        auto rec = file_hdr->get_record(rid,nullptr);
+        char* key = new char[idx_meta.col_tot_len];
+        int offset = 0;
+        for(size_t i = 0; i < idx_meta.col_num; ++i) {
+            memcpy(key + offset, rec->data + idx_meta.cols[i].offset, idx_meta.cols[i].len);
+            offset += idx_meta.cols[i].len;
+        }
+        ihs_[index_name]->insert_entry(key, rid, context->txn_);
+        scan->next();
+    }
 
     // 回到根目录
     if (chdir("..") < 0) {
