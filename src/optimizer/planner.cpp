@@ -23,7 +23,7 @@ See the Mulan PSL v2 for more details. */
 #include "record_printer.h"
 
 // 目前的索引匹配规则为：完全匹配索引字段，且全部为单点查询，不会自动调整where条件的顺序
-bool Planner::get_index_cols(std::shared_ptr<Query> query,std::string tab_name, std::vector<Condition> curr_conds, std::vector<std::string>& index_col_names) {
+bool Planner::get_index_cols(std::string tab_name, std::vector<Condition> curr_conds, std::vector<std::string>& index_col_names) {
    index_col_names.clear();
 
     // 获取表元数据
@@ -212,7 +212,7 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
         std::vector<std::string> index_col_names;
         
         //判定是否存在索引，且符合最左匹配
-        bool index_exist = get_index_cols(query,tables[i], curr_conds, index_col_names);
+        bool index_exist = get_index_cols(tables[i], curr_conds, index_col_names);
         if (index_exist == false) {  // 该表没有索引
             index_col_names.clear();
             table_scan_executors[i] = 
@@ -407,7 +407,7 @@ std::shared_ptr<Plan> Planner::do_planner(std::shared_ptr<Query> query, Context 
         // 只有一张表，不需要进行物理优化了
         // int index_no = get_indexNo(x->tab_name, query->conds);
         std::vector<std::string> index_col_names;
-        bool index_exist = get_index_cols(query,x->tab_name, query->conds, index_col_names);
+        bool index_exist = get_index_cols(x->tab_name, query->conds, index_col_names);
         
         if (index_exist == false) {  // 该表没有索引
             index_col_names.clear();
@@ -427,7 +427,7 @@ std::shared_ptr<Plan> Planner::do_planner(std::shared_ptr<Query> query, Context 
         // 只有一张表，不需要进行物理优化了
         // int index_no = get_indexNo(x->tab_name, query->conds);
         std::vector<std::string> index_col_names;
-        bool index_exist = get_index_cols(query,x->tab_name, query->conds, index_col_names);
+        bool index_exist = get_index_cols(x->tab_name, query->conds, index_col_names);
 
         if (index_exist == false) {  // 该表没有索引
         index_col_names.clear();

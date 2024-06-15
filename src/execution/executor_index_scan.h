@@ -129,19 +129,15 @@ class IndexScanExecutor : public AbstractExecutor {
                         memcpy(lower_bound_key+offset,cond.rhs_val.raw->data,col_meta->len);
                         memcpy(upper_bound_key+offset,cond.rhs_val.raw->data,col_meta->len);
                         offset += col_meta->len;
-                        //lower_bound_key += cond.rhs_val.raw->data;
-                        //upper_bound_key += cond.rhs_val.raw->data;
                         has_lower_bound = true;
                         has_upper_bound = true;
                     } else if (cond.op == OP_LT || cond.op == OP_LE) {
                         memcpy(upper_bound_key+offset,cond.rhs_val.raw->data,col_meta->len);
                         offset += col_meta->len;
-                        //upper_bound_key += cond.rhs_val.raw->data;
                         has_upper_bound = true;
                     } else if (cond.op == OP_GT || cond.op == OP_GE) {
                         memcpy(lower_bound_key+offset,cond.rhs_val.raw->data,col_meta->len);
                         offset += col_meta->len;
-                        //lower_bound_key += cond.rhs_val.raw->data;
                         has_lower_bound = true;
                     }
                     break;
