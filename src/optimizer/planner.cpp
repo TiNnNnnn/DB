@@ -38,18 +38,18 @@ bool Planner::get_index_cols(std::string tab_name, std::vector<Condition> curr_c
         }
     }
 
-    std::vector<std::string> best_index_cols;
     size_t max_match_count = 0;
+    IndexMeta best_idx;
 
     // 遍历所有索引，找到匹配最多条件的索引
     for (const auto& index : tab_idxs) {
-        std::vector<std::string> matched_index_cols;
+        //std::vector<std::string> matched_index_cols;
         size_t match_count = 0;
         bool full_match = true;
 
         for (const auto& idx_col : index.cols) {
             if (col_to_cond_map.find(idx_col.name) != col_to_cond_map.end()) {
-                matched_index_cols.push_back(idx_col.name);
+                //matched_index_cols.push_back(idx_col.name);
                 match_count++;
             } else {
                 full_match = false;
@@ -59,19 +59,20 @@ bool Planner::get_index_cols(std::string tab_name, std::vector<Condition> curr_c
 
         if (match_count > max_match_count) {
             max_match_count = match_count;
-            best_index_cols = matched_index_cols;
+            best_idx = index;
 
             // 如果找到了完全匹配的索引，直接返回
             if (full_match) {
-                index_col_names = best_index_cols;
+                //index_col_names = index;
+                for(auto e:best_idx.cols)index_col_names.push_back(e.name);
                 return true;
             }
         }
     }
-    if (best_index_cols.empty()) {
+    if (max_match_count == 0) {
         return false;
     } else {
-        index_col_names = best_index_cols;
+        for(auto e:best_idx.cols)index_col_names.push_back(e.name);
         return true;
     }
    

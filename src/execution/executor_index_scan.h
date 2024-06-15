@@ -106,6 +106,9 @@ class IndexScanExecutor : public AbstractExecutor {
         char* lower_bound_key = new char[index_meta_.col_tot_len];
         char* upper_bound_key = new char[index_meta_.col_tot_len];
 
+        memset(lower_bound_key, 0, index_meta_.col_tot_len);
+        memset(upper_bound_key, 0xFF, index_meta_.col_tot_len);
+
         bool has_lower_bound = false;
         bool has_upper_bound = false;
 
@@ -143,15 +146,15 @@ class IndexScanExecutor : public AbstractExecutor {
                     break;
                 }
             }
-            if (!col_processed) {
-                // 对于未处理的索引列，补充空白字符
-                for(int i=0;i<col_meta->len;i++){
-                    memcpy(lower_bound_key+offset,(const char*)'\0',1);
-                    memcpy(upper_bound_key+offset,(const char*)'\xFF',1);
-                    offset+=1;
-                }
-                break;
-            }
+            // if (!col_processed) {
+            //     // 对于未处理的索引列，补充空白字符
+            //     for(int i=0;i<col_meta->len;i++){
+            //         memcpy(lower_bound_key+offset,(const char*)'\0',sizeof('\0'));
+            //         memcpy(upper_bound_key+offset,(const char*)'\xFF',sizeof('xFF'));
+            //         offset+=1;
+            //     }
+            //     break;
+            // }
         }
         Iid lower_bound_iid;
         if (!has_lower_bound) {
