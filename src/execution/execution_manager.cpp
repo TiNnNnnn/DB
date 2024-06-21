@@ -7,7 +7,6 @@ THIS SOFTWARE IS PROVIDED ON AN "AS IS" BASIS, WITHOUT WARRANTIES OF ANY KIND,
 EITHER EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO NON-INFRINGEMENT,
 MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
-
 #include "execution_manager.h"
 
 #include "executor_delete.h"
@@ -149,16 +148,30 @@ void QlManager::run_cmd_utility(std::shared_ptr<Plan> plan, txn_id_t *txn_id, Co
 
 // 执行select语句，select语句的输出除了需要返回客户端外，还需要写入output.txt文件中
 void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, std::vector<TabCol> sel_cols, 
-                            Context *context) {
+                            std::vector<AggregateExpr> sel_aggs,Context *context) {
     //将待查询列名存储在captions
     std::vector<std::string> captions;
     captions.reserve(sel_cols.size());
     for (auto &sel_col : sel_cols) {
         captions.push_back(sel_col.col_name);
     }
+    for(auto &sel_agg : sel_aggs){
+        if(sel_agg.asia != "")
+            captions.push_back(sel_agg.asia);
+        else{
+            std::string agg_str =sel_agg.func_name+"(";
+            if(sel_agg.func_name == "COUNT" && sel_agg.cols.size()>1){
+                agg_str += "*)";
+            }else{
+                agg_str += sel_agg.cols[0].col_name;
+                agg_str += ")";
+            }
+            captions.push_back(agg_str);
+        } 
+    }
 
     // Print header into buffer(打印表头到缓冲区)
-    RecordPrinter rec_printer(sel_cols.size());
+    RecordPrinter rec_printer(sel_cols.size() + sel_aggs.size());
     rec_printer.print_separator(context);
     rec_printer.print_record(captions, context);
     rec_printer.print_separator(context);
@@ -179,19 +192,54 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
     for (executorTreeRoot->beginTuple(); !executorTreeRoot->is_end(); executorTreeRoot->nextTuple()) {
         auto Tuple = executorTreeRoot->Next();
         std::vector<std::string> columns;
-        for (auto &col : executorTreeRoot->cols()) {
-            std::string col_str;
-            char *rec_buf = Tuple->data + col.offset;
-            if (col.type == TYPE_INT) {
-                col_str = std::to_string(*(int *)rec_buf);
-            } else if (col.type == TYPE_FLOAT) {
-                col_str = std::to_string(*(float *)rec_buf);
-            } else if (col.type == TYPE_STRING) {
-                col_str = std::string((char *)rec_buf, col.len);
-                col_str.resize(strlen(col_str.c_str()));
+
+        if(!sel_aggs.size()){
+            int cols_offset = 0;
+            for (auto &col : executorTreeRoot->cols()) {
+                std::string col_str;
+                char *rec_buf = Tuple->data + col.offset;
+                if (col.type == TYPE_INT) {
+                    col_str = std::to_string(*(int *)rec_buf);
+                } else if (col.type == TYPE_FLOAT) {
+                    col_str = std::to_string(*(float *)rec_buf);
+                } else if (col.type == TYPE_STRING) {
+                    col_str = std::string((char *)rec_buf, col.len);
+                    col_str.resize(strlen(col_str.c_str()));
+                }
+                cols_offset += col.offset;
+                columns.push_back(col_str);
             }
-            columns.push_back(col_str);
+        }else{
+            int cols_offset = 0;
+            for (auto &col : executorTreeRoot->cols()) {
+                std::string col_str;
+                char *rec_buf = Tuple->data + cols_offset;
+                if (col.type == TYPE_INT) {
+                    col_str = std::to_string(*(int *)rec_buf);
+                } else if (col.type == TYPE_FLOAT) {
+                    col_str = std::to_string(*(float *)rec_buf);
+                } else if (col.type == TYPE_STRING) {
+                    col_str = std::string((char *)rec_buf, col.len);
+                    col_str.resize(strlen(col_str.c_str()));
+                }
+                cols_offset += col.len;
+                columns.push_back(col_str);
+            }
+            int temp_offset = cols_offset;
+            for (auto &agg : sel_aggs){
+                std::string agg_str;
+                char *rec_buf = Tuple->data + temp_offset;
+                if(agg.func_name == "COUNT"){
+                    agg_str = std::to_string(*(int *)rec_buf);
+                }else{
+                    agg_str = std::to_string(*(float *)rec_buf);
+                }
+                columns.push_back(agg_str);
+                temp_offset+=4;
+            }
         }
+
+
         // print record into buffer
         rec_printer.print_record(columns, context);
         // print record into file

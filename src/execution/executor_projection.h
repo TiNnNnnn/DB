@@ -28,6 +28,7 @@ class ProjectionExecutor : public AbstractExecutor {
 
         size_t curr_offset = 0;
         auto &prev_cols = prev_->cols();
+        
         for (auto &sel_col : sel_cols) {
             auto pos = get_col(prev_cols, sel_col);
             sel_idxs_.push_back(pos - prev_cols.begin());
@@ -53,6 +54,10 @@ class ProjectionExecutor : public AbstractExecutor {
         if (!record) {
             return nullptr; // 如果上一个节点没有下一个记录，则返回空指针
         }
+
+        if(prev_->getType() == "GroupByExecutor"){
+            return record;
+        }
         // 创建一个新的记录
         auto projected_record = std::make_unique<RmRecord>(len_);
         // 从上一个记录中复制需要投影的字段到新记录中
@@ -63,7 +68,6 @@ class ProjectionExecutor : public AbstractExecutor {
             auto dest_data = projected_record->data + col.offset;     // 获取新记录中投影字段的位置
             std::memcpy(dest_data, src_data, col.len); // 将数据复制到新记录中
         }
-
         return projected_record;
     }
 

@@ -91,7 +91,7 @@ struct TabMeta {
     /* 判断当前表上是否建有指定索引，索引包含的字段为col_names */
     bool is_index(const std::vector<std::string>& col_names) const {
         for(auto& index: indexes) {
-            if(index.col_num == col_names.size()) {
+            if(size_t(index.col_num) == col_names.size()) {
                 size_t i = 0;
                 for(; i < index.col_num; ++i) {
                     if(index.cols[i].name.compare(col_names[i]) != 0)

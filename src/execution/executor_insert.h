@@ -45,7 +45,13 @@ class InsertExecutor : public AbstractExecutor {
             auto &col = tab_.cols[i];
             auto &val = values_[i];
             if (col.type != val.type) {
-                throw IncompatibleTypeError(coltype2str(col.type), coltype2str(val.type));
+                if(col.type == TYPE_FLOAT && val.type == TYPE_INT){
+                    val.float_val = float(val.int_val);
+                    val.type = TYPE_FLOAT;
+                }else{
+                     throw IncompatibleTypeError(coltype2str(col.type), coltype2str(val.type));
+                }
+               
             }
             val.init_raw(col.len);
             memcpy(rec.data + col.offset, val.raw->data, col.len);

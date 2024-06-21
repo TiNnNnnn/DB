@@ -43,7 +43,9 @@ typedef enum PlanTag{
     T_NestLoop,
     T_SortMerge,    // sort merge join
     T_Sort,
-    T_Projection
+    T_Projection,
+    T_GroupBy,
+    T_Aggregate,
 } PlanTag;
 
 // 查询执行计划
@@ -105,15 +107,17 @@ class JoinPlan : public Plan
 class ProjectionPlan : public Plan
 {
     public:
-        ProjectionPlan(PlanTag tag, std::shared_ptr<Plan> subplan, std::vector<TabCol> sel_cols)
+        ProjectionPlan(PlanTag tag, std::shared_ptr<Plan> subplan, std::vector<TabCol> sel_cols,std::vector<AggregateExpr> sel_aggs)
         {
             Plan::tag = tag;
             subplan_ = std::move(subplan);
             sel_cols_ = std::move(sel_cols);
+            sel_aggs_ = std::move(sel_aggs);
         }
         ~ProjectionPlan(){}
         std::shared_ptr<Plan> subplan_;
         std::vector<TabCol> sel_cols_;
+        std::vector<AggregateExpr> sel_aggs_;
         
 };
 
@@ -132,6 +136,45 @@ class SortPlan : public Plan
         TabCol sel_col_;
         bool is_desc_;
         
+};
+
+//聚合任务（unused）
+class AggregatePlan : public Plan
+{
+public:
+    AggregatePlan(PlanTag tag, std::shared_ptr<Plan> subplan, std::vector<AggregateExpr> agg_exprs)
+    {
+        Plan::tag = tag;
+        subplan_ = std::move(subplan);
+        agg_exprs_ = std::move(agg_exprs);
+    }
+    ~AggregatePlan() {}
+    
+    std::shared_ptr<Plan> subplan_;
+    std::vector<AggregateExpr> agg_exprs_;
+};
+
+//分组任务 (覆盖聚合任务)
+class GroupByPlan : public Plan
+{
+public:
+    GroupByPlan(PlanTag tag, std::shared_ptr<Plan> subplan, std::vector<TabCol> group_by_cols,  std::vector<Condition> having_clauses,
+    std::vector<AggregateExpr> agg_exprs,std::vector<TabCol>sel_cols)
+    {
+        Plan::tag = tag;
+        subplan_ = std::move(subplan);
+        group_by_cols_ = std::move(group_by_cols);
+        having_clauses_ = std::move(having_clauses);
+        agg_exprs_ = std::move(agg_exprs);
+        sel_cols_ =std::move(sel_cols);
+    }
+    ~GroupByPlan() {}
+    
+    std::shared_ptr<Plan> subplan_;
+    std::vector<TabCol> group_by_cols_;
+    std::vector<Condition> having_clauses_;
+    std::vector<AggregateExpr> agg_exprs_;
+    std::vector<TabCol>sel_cols_;
 };
 
 // dml语句，包括insert; delete; update; select语句　

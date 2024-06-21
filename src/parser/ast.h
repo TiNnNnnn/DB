@@ -16,6 +16,7 @@ See the Mulan PSL v2 for more details. */
 enum JoinType {
     INNER_JOIN, LEFT_JOIN, RIGHT_JOIN, FULL_JOIN
 };
+
 namespace ast {
 
 enum SvType {
@@ -124,6 +125,10 @@ struct Expr : public TreeNode {
 struct Value : public Expr {
 };
 
+struct StarExpr : public Expr {
+    // You can add any necessary fields or methods
+};
+
 struct IntLit : public Value {
     int val;
 
@@ -149,12 +154,15 @@ struct BoolLit : public Value {
 };
 
 struct Col : public Expr {
+public:
     std::string tab_name;
     std::string col_name;
+    std::string alias; 
 
-    Col(std::string tab_name_, std::string col_name_) :
-            tab_name(std::move(tab_name_)), col_name(std::move(col_name_)) {}
+    Col(std::string tab_name_, std::string col_name_,std::string alias_ = "") :
+            tab_name(std::move(tab_name_)), col_name(std::move(col_name_)),alias(std::move(alias_)) {}
 };
+
 
 struct SetClause : public TreeNode {
     std::string col_name;
@@ -164,12 +172,13 @@ struct SetClause : public TreeNode {
             col_name(std::move(col_name_)), val(std::move(val_)) {}
 };
 
+//FIX: convert lhs <Col> to lhs <Expr> for aggragating
 struct BinaryExpr : public TreeNode {
-    std::shared_ptr<Col> lhs;
+    std::shared_ptr<Expr> lhs;
     SvCompOp op;
     std::shared_ptr<Expr> rhs;
 
-    BinaryExpr(std::shared_ptr<Col> lhs_, SvCompOp op_, std::shared_ptr<Expr> rhs_) :
+    BinaryExpr(std::shared_ptr<Expr> lhs_, SvCompOp op_, std::shared_ptr<Expr> rhs_) :
             lhs(std::move(lhs_)), op(op_), rhs(std::move(rhs_)) {}
 };
 
@@ -219,23 +228,45 @@ struct JoinExpr : public TreeNode {
             left(std::move(left_)), right(std::move(right_)), conds(std::move(conds_)), type(type_) {}
 };
 
+struct AggregateExpr : public Expr {
+    std::string func_name; // e.g., "SUM", "AVG"
+    std::shared_ptr<Expr> arg;
+    std::string alias; 
+
+    AggregateExpr(std::string func_name_, std::shared_ptr<Expr> arg_, std::string alias_ = "") :
+            func_name(std::move(func_name_)), arg(std::move(arg_)),alias(std::move(alias_)) {}
+};
+
+struct Having : public TreeNode {
+    std::vector<std::shared_ptr<BinaryExpr>> conditions;
+    Having(std::vector<std::shared_ptr<BinaryExpr>> condition_) : conditions(std::move(condition_)) {}
+};
+
+struct GroupBy : public TreeNode {
+    std::vector<std::shared_ptr<Col>> cols; // 列名列表
+    std::shared_ptr<Having> havingClause;   // HAVING 子句中的条件列表
+
+    GroupBy(std::vector<std::shared_ptr<Col>> cols_, std::shared_ptr<Having> conditions_)
+        : cols(std::move(cols_)), havingClause(std::move(conditions_)) {}
+};
+
+
 struct SelectStmt : public TreeNode {
-    std::vector<std::shared_ptr<Col>> cols;
+    std::vector<std::shared_ptr<Expr>> cols; // *,cols, aggregate_exprs
     std::vector<std::string> tabs;
     std::vector<std::shared_ptr<BinaryExpr>> conds;
     std::vector<std::shared_ptr<JoinExpr>> jointree;
-
-    
+    std::shared_ptr<GroupBy> group_by;
     bool has_sort;
     std::shared_ptr<OrderBy> order;
 
-
-    SelectStmt(std::vector<std::shared_ptr<Col>> cols_,
+    SelectStmt(std::vector<std::shared_ptr<Expr>> cols_,
                std::vector<std::string> tabs_,
                std::vector<std::shared_ptr<BinaryExpr>> conds_,
+               std::shared_ptr<GroupBy> group_by_,
                std::shared_ptr<OrderBy> order_) :
             cols(std::move(cols_)), tabs(std::move(tabs_)), conds(std::move(conds_)), 
-            order(std::move(order_)) {
+            group_by(std::move(group_by_)), order(std::move(order_)) {
                 has_sort = (bool)order;
             }
 };
@@ -268,6 +299,7 @@ struct SemValue {
     std::vector<std::shared_ptr<Field>> sv_fields;
 
     std::shared_ptr<Expr> sv_expr;
+    std::vector<std::shared_ptr<Expr>> sv_exprs;
 
     std::shared_ptr<Value> sv_val;
     std::vector<std::shared_ptr<Value>> sv_vals;
@@ -282,6 +314,12 @@ struct SemValue {
     std::vector<std::shared_ptr<BinaryExpr>> sv_conds;
 
     std::shared_ptr<OrderBy> sv_orderby;
+    //std::shared_ptr<OrderByDir> sv_orderby_dir;
+
+    std::shared_ptr<GroupBy> sv_group_by;
+    std::shared_ptr<Having> sv_having;
+    std::shared_ptr<AggregateExpr> sv_aggregate_expr;
+    std::vector<std::shared_ptr<AggregateExpr>> sv_aggregate_exprs;
 
     SetKnobType sv_setKnobType;
 };

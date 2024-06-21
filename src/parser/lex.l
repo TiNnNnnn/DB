@@ -55,6 +55,7 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 {white_space} { /* ignore white space */ }
 {new_line} { /* ignore new line */ }
     /* keywords */
+
 "SHOW" { return SHOW; }
 "BEGIN" { return TXN_BEGIN; }
 "COMMIT" { return TXN_COMMIT; }
@@ -69,6 +70,7 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 "INTO" { return INTO; }
 "VALUES" { return VALUES; }
 "DELETE" { return DELETE; }
+"AS" { return AS; }
 "FROM" { return FROM; }
 "WHERE" { return WHERE; }
 "UPDATE" { return UPDATE; }
@@ -95,6 +97,17 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
     yylval->sv_bool = false;
     return VALUE_BOOL;
 }
+
+"SUM" { return SUM; }
+"AVG" { return AVG; }
+"MIN" { return MIN; }
+"MAX" { return MAX; }
+"COUNT" { return COUNT; }
+
+"GROUP" { return GROUP; }
+"HAVING" { return HAVING; }
+
+
     /* operators */
 ">=" { return GEQ; }
 "<=" { return LEQ; }

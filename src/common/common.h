@@ -28,6 +28,8 @@ struct TabCol {
     }
 };
 
+
+
 struct Value {
     ColType type;  // type of value
     union {
@@ -74,9 +76,21 @@ struct Value {
 
 enum CompOp { OP_EQ, OP_NE, OP_LT, OP_GT, OP_LE, OP_GE };
 
+//聚合函数
+struct AggregateExpr{
+    std::vector<std::string> tab_name;
+    std::string func_name;
+    //TODO-06-17: support more expr
+    //if COUNT(*) cols.size > 1 
+    std::vector<TabCol> cols;
+    std::string asia; 
+};
+
 struct Condition {
+    AggregateExpr lhs_agg;  //left-agg side aggregation
     TabCol lhs_col;   // left-hand side column
     CompOp op;        // comparison operator
+    bool is_lhs_col;  // true is right-hand side is a col (not a aggregation)
     bool is_rhs_val;  // true if right-hand side is a value (not a column)
     TabCol rhs_col;   // right-hand side column
     Value rhs_val;    // right-hand side value
@@ -85,4 +99,13 @@ struct Condition {
 struct SetClause {
     TabCol lhs;
     Value rhs;
+};
+
+
+
+//分组函数
+struct GroupByExpr{
+    std::vector<std::string> tab_name;
+    std::vector<TabCol> cols;  // 列名列表
+    std::vector<Condition> havingClause;   // HAVING 子句中的条件列表
 };

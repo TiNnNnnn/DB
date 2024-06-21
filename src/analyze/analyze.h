@@ -26,7 +26,6 @@ class Query{
     //ast tree(查询语法树)
     std::shared_ptr<ast::TreeNode> parse;
     // TODO jointree
-
     // where条件
     std::vector<Condition> conds;
     // 投影列 (cols while select)
@@ -37,6 +36,10 @@ class Query{
     std::vector<SetClause> set_clauses;
     //insert 的values值
     std::vector<Value> values;
+    //聚合函数
+    std::vector<AggregateExpr> a_exprs;
+    //分组函数（包含having）
+    GroupByExpr gb_expr;
 
     Query(){}
 
@@ -58,8 +61,11 @@ private:
     TabCol check_column(const std::vector<ColMeta> &all_cols, TabCol target);
     //获取给定表名列表中的所有列元数据，并将其存储在 all_cols 向量中
     void get_all_cols(const std::vector<std::string> &tab_names, std::vector<ColMeta> &all_cols);
+
+    std::string get_tb_name(const std::vector<std::string> &tab_names, std::string col_name);
+
     //从一组二元表达式（ast::BinaryExpr）中提取条件，并将其转换为 Condition 向量
-    void get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv_conds, std::vector<Condition> &conds);
+    void get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv_conds, std::vector<Condition> &conds,std::vector<std::string> tables);
     //检查条件中涉及的列是否在指定的表名列表中
     void check_clause(const std::vector<std::string> &tab_names, std::vector<Condition> &conds);
     //将语法树中的值节点（ast::Value）转换为系统中定义的 Value 类型

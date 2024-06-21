@@ -79,18 +79,25 @@ extern int yydebug;
     TXN_COMMIT = 285,
     TXN_ABORT = 286,
     TXN_ROLLBACK = 287,
-    ORDER_BY = 288,
-    ENABLE_NESTLOOP = 289,
-    ENABLE_SORTMERGE = 290,
+    ENABLE_NESTLOOP = 288,
+    ENABLE_SORTMERGE = 289,
+    AS = 290,
     LEQ = 291,
     NEQ = 292,
     GEQ = 293,
     T_EOF = 294,
-    IDENTIFIER = 295,
-    VALUE_STRING = 296,
-    VALUE_INT = 297,
-    VALUE_FLOAT = 298,
-    VALUE_BOOL = 299
+    COUNT = 295,
+    SUM = 296,
+    AVG = 297,
+    MIN = 298,
+    MAX = 299,
+    GROUP = 300,
+    HAVING = 301,
+    IDENTIFIER = 302,
+    VALUE_STRING = 303,
+    VALUE_INT = 304,
+    VALUE_FLOAT = 305,
+    VALUE_BOOL = 306
   };
 #endif
 
