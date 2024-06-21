@@ -28,6 +28,7 @@ See the Mulan PSL v2 for more details. */
 #define MAX_CONN_LIMIT 8
 
 static bool should_exit = false;
+std::string global_db_name;
 
 // 构建全局所需的管理器对象
 auto disk_manager = std::make_unique<DiskManager>();
@@ -148,6 +149,7 @@ void *client_handler(void *sock_fd) {
                     txn_manager->abort(context->txn_, log_manager.get());
                     std::cout << e.GetInfo() << std::endl;
 
+
                     std::fstream outfile;
                     outfile.open("output.txt", std::ios::out | std::ios::app);
                     outfile << str;
@@ -161,11 +163,22 @@ void *client_handler(void *sock_fd) {
                     data_send[e.get_msg_len() + 1] = '\0';
                     offset = e.get_msg_len() + 1;
 
+                    if (!sm_manager->is_dir(global_db_name)) {
+                        throw DatabaseNotFoundError(global_db_name);
+                    }
+                    if (chdir(global_db_name.c_str()) < 0) {  // 进入数据库目录
+                        throw UnixError();
+                    }
                     // 将报错信息写入output.txt
                     std::fstream outfile;
                     outfile.open("output.txt",std::ios::out | std::ios::app);
                     outfile << "failure\n";
                     outfile.close();
+
+                    if (chdir("..") < 0) {
+                        throw UnixError();
+                    }
+
                 }
             }
         }
@@ -271,6 +284,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+
+
     signal(SIGINT, sigint_handler);
     try {
         std::cout << "\n"
@@ -286,6 +301,7 @@ int main(int argc, char **argv) {
                      "\n";
         // Database name is passed by args
         std::string db_name = argv[1];
+        global_db_name = db_name;
         if (!sm_manager->is_dir(db_name)) {
             // Database not found, create a new one
             sm_manager->create_db(db_name);
