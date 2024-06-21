@@ -250,14 +250,14 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
         //lhs is Col
         if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)){
             cond.is_lhs_col = true;
-            cond.lhs_col = {get_tb_name(tables,expr->col_name), expr->col_name};
+            cond.lhs_col = {expr->tab_name, expr->col_name};
             cond.op = convert_sv_comp_op(e->op);
             if (auto rhs_val = std::dynamic_pointer_cast<ast::Value>(e->rhs)) {
                 cond.is_rhs_val = true;
                 cond.rhs_val = convert_sv_value(rhs_val);
-            } else if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)) {
+            } else if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->rhs)) {
                 cond.is_rhs_val = false;
-                cond.rhs_col = {get_tb_name(tables,expr->col_name), expr->col_name};
+                cond.rhs_col = {expr->tab_name, expr->col_name};
             } 
         //rhs is Aggregate
         }else if(auto arg = std::dynamic_pointer_cast<ast::AggregateExpr>(e->lhs)){

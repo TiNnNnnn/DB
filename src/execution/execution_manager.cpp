@@ -238,8 +238,6 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
                 temp_offset+=4;
             }
         }
-
-
         // print record into buffer
         rec_printer.print_record(columns, context);
         // print record into file
