@@ -119,7 +119,6 @@ class Portal
         }
         return nullptr;
     }
-
     // 遍历算子树并执行算子生成执行结果
     void run(std::shared_ptr<PortalStmt> portal, QlManager* ql, txn_id_t *txn_id, Context *context){
         switch(portal->tag) {
@@ -128,7 +127,6 @@ class Portal
                 ql->select_from(std::move(portal->root), std::move(portal->sel_cols),std::move(portal->sel_aggs) ,context);
                 break;
             }
-
             case PORTAL_DML_WITHOUT_SELECT:
             {
                 ql->run_dml(std::move(portal->root));

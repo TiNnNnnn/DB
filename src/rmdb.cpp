@@ -149,11 +149,21 @@ void *client_handler(void *sock_fd) {
                     txn_manager->abort(context->txn_, log_manager.get());
                     std::cout << e.GetInfo() << std::endl;
 
-
+                    if (!sm_manager->is_dir(global_db_name)) {
+                        throw DatabaseNotFoundError(global_db_name);
+                    }
+                    if (chdir(global_db_name.c_str()) < 0) {  // 进入数据库目录
+                        throw UnixError();
+                    }
+                    
                     std::fstream outfile;
                     outfile.open("output.txt", std::ios::out | std::ios::app);
                     outfile << str;
                     outfile.close();
+
+                    if (chdir("..") < 0) {
+                        throw UnixError();
+                    }
                 } catch (RMDBError &e) {
                     // 遇到异常，需要打印failure到output.txt文件中，并发异常信息返回给客户端
                     std::cerr << e.what() << std::endl;
