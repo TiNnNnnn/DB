@@ -155,7 +155,7 @@ void *client_handler(void *sock_fd) {
                     if (chdir(global_db_name.c_str()) < 0) {  // 进入数据库目录
                         throw UnixError();
                     }
-                    
+
                     std::fstream outfile;
                     outfile.open("output.txt", std::ios::out | std::ios::app);
                     outfile << str;
@@ -188,7 +188,6 @@ void *client_handler(void *sock_fd) {
                     if (chdir("..") < 0) {
                         throw UnixError();
                     }
-
                 }
             }
         }
