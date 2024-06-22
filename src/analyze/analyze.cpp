@@ -314,7 +314,7 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
             if (auto rhs_val = std::dynamic_pointer_cast<ast::Value>(e->rhs)) {
                 cond.is_rhs_val = true;
                 cond.rhs_val = convert_sv_value(rhs_val);
-            } else if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)) {
+            } else if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->rhs)) {
                 // cond.is_rhs_val = false;
                 // cond.rhs_col = {expr->tab_name, expr->col_name};
                 throw InternalError("aggregation right cond must be value");
