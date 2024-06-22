@@ -96,7 +96,6 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
         }
         check_clause(query->tables, query->conds);
 
-
         //处理分组条件
         if(x->group_by){
             auto group_cols = x->group_by->cols;
@@ -316,8 +315,9 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 cond.is_rhs_val = true;
                 cond.rhs_val = convert_sv_value(rhs_val);
             } else if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)) {
-                cond.is_rhs_val = false;
-                cond.rhs_col = {expr->tab_name, expr->col_name};
+                // cond.is_rhs_val = false;
+                // cond.rhs_col = {expr->tab_name, expr->col_name};
+                throw InternalError("aggregation right cond must be value");
             }
         }else{
             //ERROR
