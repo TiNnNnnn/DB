@@ -197,8 +197,6 @@ std::shared_ptr<Plan> Planner::physical_optimization(std::shared_ptr<Query> quer
     return plan;
 }
 
-
-
 std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
 {
     auto x = std::dynamic_pointer_cast<ast::SelectStmt>(query->parse);

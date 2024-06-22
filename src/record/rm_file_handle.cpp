@@ -120,7 +120,8 @@ void RmFileHandle::delete_record(const Rid& rid, Context* context) {
 
     // 2. 检查指定位置是否有记录
     if (!Bitmap::is_set(page_handle.bitmap, rid.slot_no)) {
-        throw std::runtime_error("The specified slot is already empty.");
+        return;
+        //throw std::runtime_error("The specified slot is already empty.");
     }
 
     // 3. 将bitmap中指定位置的bit清除，并更新页面头部的记录数
