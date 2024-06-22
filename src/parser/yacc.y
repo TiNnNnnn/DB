@@ -61,6 +61,7 @@ using namespace ast;
 //%type <sv_aggregate_exprs> aggregate_exprs
 %type <sv_setKnobType> set_knob_type
 %type <sv_str> opt_as_alias
+%type <sv_subquery> subquery
 
 %%
 start:
@@ -173,6 +174,15 @@ dml:
     }
     ;
 
+subquery:
+    '(' SELECT selector FROM tableList optWhereClause opt_group_clause opt_order_clause ')'
+    {
+        $$ = std::make_shared<Subquery>(
+            std::make_shared<SelectStmt>($3, $5, $6, $7, $8)
+        );
+    }
+    ;
+
 fieldList:
         field
     {
@@ -257,6 +267,14 @@ condition:
         $$ = std::make_shared<BinaryExpr>($1, $2, $3);
     }
     | expr op aggregate_expr
+    {
+        $$ = std::make_shared<BinaryExpr>($1, $2, $3);
+    }
+    | expr op subquery
+    {
+        $$ = std::make_shared<BinaryExpr>($1, $2, $3);
+    }
+    | subquery op expr
     {
         $$ = std::make_shared<BinaryExpr>($1, $2, $3);
     }

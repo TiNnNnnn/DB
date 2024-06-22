@@ -147,8 +147,8 @@ void QlManager::run_cmd_utility(std::shared_ptr<Plan> plan, txn_id_t *txn_id, Co
 }
 
 // 执行select语句，select语句的输出除了需要返回客户端外，还需要写入output.txt文件中
-void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, std::vector<TabCol> sel_cols, 
-                            std::vector<AggregateExpr> sel_aggs,Context *context) {
+std::vector<std::vector<std::string>> QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, std::vector<TabCol> sel_cols, 
+                            std::vector<AggregateExpr> sel_aggs,Context *context,bool is_son) {
     //将待查询列名存储在captions
     std::vector<std::string> captions;
     captions.reserve(sel_cols.size());
@@ -170,21 +170,30 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
         } 
     }
 
+
     // Print header into buffer(打印表头到缓冲区)
     RecordPrinter rec_printer(sel_cols.size() + sel_aggs.size());
-    rec_printer.print_separator(context);
-    rec_printer.print_record(captions, context);
-    rec_printer.print_separator(context);
+
+    if(!is_son){
+        rec_printer.print_separator(context);
+        rec_printer.print_record(captions, context);
+        rec_printer.print_separator(context);
+    }
     
     // print header into file (将表头信息写入output.txt)
     std::fstream outfile;
-    std::string out_file_name = sm_manager_->get_db_name() + "/output.txt";
-    outfile.open(out_file_name, std::ios::out | std::ios::app);
-    outfile << "|";
-    for(int i = 0; i < captions.size(); ++i) {
-        outfile << " " << captions[i] << " |";
+    if(!is_son){
+        std::string out_file_name = sm_manager_->get_db_name() + "/output.txt";
+        outfile.open(out_file_name, std::ios::out | std::ios::app);
+        outfile << "|";
+        for(int i = 0; i < captions.size(); ++i) {
+            outfile << " " << captions[i] << " |";
+        }
+        outfile << "\n";
     }
-    outfile << "\n";
+   
+
+    std::vector<std::vector<std::string>>rets;
 
     // Print records
     size_t num_rec = 0;
@@ -238,21 +247,29 @@ void QlManager::select_from(std::unique_ptr<AbstractExecutor> executorTreeRoot, 
                 temp_offset+=4;
             }
         }
-        // print record into buffer
-        rec_printer.print_record(columns, context);
-        // print record into file
-        outfile << "|";
-        for(int i = 0; i < columns.size(); ++i) {
-            outfile << " " << columns[i] << " |";
+
+        if(!is_son){
+            // print record into buffer
+            rec_printer.print_record(columns, context);
+            // print record into file
+            outfile << "|";
+            for(int i = 0; i < columns.size(); ++i) {
+                outfile << " " << columns[i] << " |";
+            }
+            outfile << "\n";
         }
-        outfile << "\n";
+       
         num_rec++;
+        rets.push_back(columns);
     }
     outfile.close();
-    // Print footer into buffer
-    rec_printer.print_separator(context);
-    // Print record count into buffer
-    RecordPrinter::print_record_count(num_rec, context);
+    if(!is_son){
+        // Print footer into buffer
+        rec_printer.print_separator(context);
+        // Print record count into buffer
+        RecordPrinter::print_record_count(num_rec, context);
+    }
+    return rets;
 }
 
 // 执行DML语句

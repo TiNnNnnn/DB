@@ -9,6 +9,12 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 #include "analyze.h"
+#include "optimizer/optimizer.h"
+#include "recovery/log_recovery.h"
+#include "optimizer/plan.h"
+#include "optimizer/planner.h"
+#include "portal.h"
+#include "analyze/analyze.h"
 
 /**
  * @description: 分析器，进行语义分析和查询重写，需要检查不符合语义规定的部分
@@ -127,7 +133,6 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
                         }
                     }
                 }
-
                 get_clause(group_having_clauses->conditions, gb_expr.havingClause,query->tables);
             }
             //check_clause(query->tables, gb_expr.havingClause);
@@ -262,6 +267,8 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
             cond.is_lhs_col = true;
             if(tables.size()>1)cond.lhs_col = {expr->tab_name, expr->col_name};
             else cond.lhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
+
+
             cond.op = convert_sv_comp_op(e->op);
             if (auto rhs_val = std::dynamic_pointer_cast<ast::Value>(e->rhs)) {
                 cond.is_rhs_val = true;
@@ -270,7 +277,102 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 cond.is_rhs_val = false;
                 if(tables.size()>1)cond.rhs_col = {expr->tab_name, expr->col_name};
                 else cond.rhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
-            } 
+            } else if (auto sub_query = std::dynamic_pointer_cast<ast::Subquery>(e->rhs)){
+                cond.is_rhs_val = false;
+                //右边是标量子查询 （TODO: 子查询可能在左边）
+                auto disk_manager = std::make_unique<DiskManager>();
+                auto analyze = std::make_unique<Analyze>(sm_manager_);
+                auto planner = std::make_unique<Planner>(sm_manager_);
+                auto optimizer = std::make_unique<Optimizer>(sm_manager_, planner.get());
+                auto lock_manager = std::make_unique<LockManager>();
+                auto txn_manager = std::make_unique<TransactionManager>(lock_manager.get(), sm_manager_);
+                auto log_manager = std::make_unique<LogManager>(disk_manager.get());
+                auto ql_manager = std::make_unique<QlManager>(sm_manager_, txn_manager.get(),planner.get());
+                auto portal = std::make_unique<Portal>(sm_manager_);
+                pthread_mutex_t *buffer_mutex;
+                txn_id_t txn_id = INVALID_TXN_ID;
+                Context *context = new Context(lock_manager.get(), log_manager.get(), nullptr, nullptr, 0);
+
+                // 解析器
+                std::shared_ptr<Query> query = analyze->do_analyze(sub_query->select_stmt);
+                std::vector<ColMeta> all_cols;
+                get_all_cols(query->tables, all_cols);
+
+                //取出左值
+                TabCol l_tab_col;
+                ColMeta l_col_meta;
+                if(auto l_expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)){
+                    //检查左右类型是否匹配
+                    if(query->tables.size()>1){
+                        l_tab_col = {l_expr->tab_name,l_expr->col_name};
+                    }else{
+                        l_tab_col = {get_tb_name(query->tables,l_expr->col_name),l_expr->col_name};
+                    }
+                    check_column(all_cols,l_tab_col);
+                    l_col_meta = *sm_manager_->db_.get_table(l_tab_col.tab_name).get_col(l_tab_col.col_name);
+                }else{
+                    throw InternalError("Scalar Subquery left must be col");
+                }
+
+                //保证返回结果为单列
+                if(query->cols.size()>1 || query->a_exprs.size()>1 || (query->cols.size()+query->a_exprs.size()>1)){
+                    throw InternalError("Scalar Subquery's return value must be a tuple with one col");
+                }
+
+                //检验类型是否匹配
+                if(query->cols.size()){
+                    assert(query->cols.size() == 1);
+                    auto tab_col = query->cols[0];
+                    auto col_meta = sm_manager_->db_.get_table(tab_col.tab_name).get_col(tab_col.col_name);
+                    if(col_meta->type != l_col_meta.type){
+                        throw IncompatibleTypeError(std::to_string(l_col_meta.type),std::to_string(col_meta->type));
+                    }
+                }
+
+                if(query->a_exprs.size()){
+                    assert(query->a_exprs.size() == 1);
+                    auto a_expr = query->a_exprs[0];
+                    if(a_expr.func_name == "COUNT"){
+                        if(l_col_meta.type != TYPE_INT){
+                            throw InternalError("type compatible error");
+                        }
+                    }else{
+                        if(l_col_meta.type != TYPE_FLOAT){
+                            throw InternalError("type compatible error");
+                        }
+                    }
+                }
+
+                // 优化器
+                std::shared_ptr<Plan> plan = optimizer->plan_query(query, context);
+                // 执行器
+                std::shared_ptr<PortalStmt> portalStmt = portal->start(plan, context);
+                auto ret = portal->run(portalStmt, ql_manager.get(), &txn_id, context,true);
+                portal->drop();
+                
+                
+                if( ret.size() != 1){
+                    throw InternalError("Scalar Subquery's return value must be single value");
+                }
+                if( ret[0].size() != 1){
+                    throw InternalError("Scalar Subquery's return value must be a tuple with one col");
+                }
+                std::string r_str = ret[0][0];
+
+                Value r_val;
+                if(l_col_meta.type == TYPE_INT){
+                    r_val.set_int(std::atoi(r_str.c_str()));
+                }else if(l_col_meta.type == TYPE_FLOAT){
+                    r_val.set_float(std::atof(r_str.c_str()));
+                }else{
+                    r_val.set_str(r_str);
+                }
+
+                cond.is_lhs_col = true;
+                cond.is_rhs_val = true;
+                cond.lhs_col = l_tab_col;
+                cond.rhs_val = r_val;
+            }
         //rhs is Aggregate
         }else if(auto arg = std::dynamic_pointer_cast<ast::AggregateExpr>(e->lhs)){
             std::vector<ColMeta> all_cols;

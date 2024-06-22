@@ -271,6 +271,14 @@ struct SelectStmt : public TreeNode {
             }
 };
 
+//Scalar Subquery
+struct Subquery : public Expr {
+    std::shared_ptr<SelectStmt> select_stmt;
+
+    Subquery(std::shared_ptr<SelectStmt> select_stmt_) :
+        select_stmt(std::move(select_stmt_)) {}
+};
+
 // set enable_nestloop
 struct SetStmt : public TreeNode {
     SetKnobType set_knob_type_;
@@ -320,6 +328,8 @@ struct SemValue {
     std::shared_ptr<Having> sv_having;
     std::shared_ptr<AggregateExpr> sv_aggregate_expr;
     std::vector<std::shared_ptr<AggregateExpr>> sv_aggregate_exprs;
+
+    std::shared_ptr<Subquery> sv_subquery;
 
     SetKnobType sv_setKnobType;
 };

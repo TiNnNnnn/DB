@@ -120,11 +120,12 @@ class Portal
         return nullptr;
     }
     // 遍历算子树并执行算子生成执行结果
-    void run(std::shared_ptr<PortalStmt> portal, QlManager* ql, txn_id_t *txn_id, Context *context){
+    std::vector<std::vector<std::string>> run(std::shared_ptr<PortalStmt> portal, QlManager* ql, txn_id_t *txn_id, Context *context,bool is_son = false){
         switch(portal->tag) {
             case PORTAL_ONE_SELECT:
             {
-                ql->select_from(std::move(portal->root), std::move(portal->sel_cols),std::move(portal->sel_aggs) ,context);
+                auto ret = ql->select_from(std::move(portal->root), std::move(portal->sel_cols),std::move(portal->sel_aggs) ,context,is_son);
+                return ret;
                 break;
             }
             case PORTAL_DML_WITHOUT_SELECT:
