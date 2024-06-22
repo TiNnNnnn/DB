@@ -118,7 +118,18 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
 
             //处理分组条件中的HAVING子句
             if(group_having_clauses){
-                 get_clause(group_having_clauses->conditions, gb_expr.havingClause,query->tables);
+                for(auto& cond : group_having_clauses->conditions){
+                    if (auto expr = std::dynamic_pointer_cast<ast::Col>(cond->lhs)){
+                        TabCol col;
+                        if(query->tables.size()>1)col = {expr->tab_name, expr->col_name};
+                        else col = {get_tb_name(query->tables,expr->col_name),expr->col_name};
+                        if(col_set.find(col) == col_set.end()){
+                            throw InternalError("having has cols that groupby cols not exist");
+                        }
+                    }
+                }
+
+                get_clause(group_having_clauses->conditions, gb_expr.havingClause,query->tables);
             }
             //check_clause(query->tables, gb_expr.havingClause);
             query->gb_expr = gb_expr;
@@ -250,14 +261,16 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
         //lhs is Col
         if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)){
             cond.is_lhs_col = true;
-            cond.lhs_col = {expr->tab_name, expr->col_name};
+            if(tables.size()>1)cond.lhs_col = {expr->tab_name, expr->col_name};
+            else cond.lhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
             cond.op = convert_sv_comp_op(e->op);
             if (auto rhs_val = std::dynamic_pointer_cast<ast::Value>(e->rhs)) {
                 cond.is_rhs_val = true;
                 cond.rhs_val = convert_sv_value(rhs_val);
             } else if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->rhs)) {
                 cond.is_rhs_val = false;
-                cond.rhs_col = {expr->tab_name, expr->col_name};
+                if(tables.size()>1)cond.rhs_col = {expr->tab_name, expr->col_name};
+                else cond.rhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
             } 
         //rhs is Aggregate
         }else if(auto arg = std::dynamic_pointer_cast<ast::AggregateExpr>(e->lhs)){
