@@ -219,6 +219,15 @@ private:
 
         for (const auto &cond : having_clauses_) {
             bool condition_met = false;
+
+            if(cond.op == CompOp::IN){
+                for(auto r: group.second){
+                    if(!match_condition(&r,cond)){
+                        return false;
+                    }
+                }
+                continue;
+            }
             if(cond.is_lhs_col){
                 for(auto r : group.second){
                     if(!match_condition(&r,cond)){
@@ -337,6 +346,23 @@ private:
     bool match_condition(const RmRecord *record, const Condition &cond) {
         auto lhs_col_meta = get_col(cols_, cond.lhs_col);
         char *lhs_data = record->data + lhs_col_meta->offset;
+
+        if(cond.op == CompOp::IN){
+            bool is_find = false;
+            auto rhs_vals = cond.rhs_vals;
+            for(auto& rhs_val : rhs_vals){
+                if (eval_condition(lhs_data, lhs_col_meta->type, CompOp::OP_EQ , rhs_val)) {
+                    is_find = true;
+                    break;
+                }
+            }
+            if(!is_find){
+                return false;
+            }
+            return true; 
+        }
+
+
         if (cond.is_rhs_val) {
             // 右边是常量值
             if (!eval_condition(lhs_data, lhs_col_meta->type, cond.op, cond.rhs_val)) {

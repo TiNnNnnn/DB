@@ -104,14 +104,16 @@ single_op ";"|"("|")"|","|"*"|"="|">"|"<"|"."
 "MAX" { return MAX; }
 "COUNT" { return COUNT; }
 
+"IN" { return IN; }
+
 "GROUP" { return GROUP; }
 "HAVING" { return HAVING; }
-
 
     /* operators */
 ">=" { return GEQ; }
 "<=" { return LEQ; }
 "<>" { return NEQ; }
+
 {single_op} { return yytext[0]; }
     /* id */
 {identifier} {

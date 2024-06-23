@@ -107,6 +107,23 @@ class SeqScanExecutor : public AbstractExecutor {
         for (const auto &cond : conds) {
             auto lhs_col_meta = get_col(cols_, cond.lhs_col);
             char *lhs_data = record->data + lhs_col_meta->offset;
+            
+            //特殊处理IN子句
+            if(cond.op == CompOp::IN){
+                bool is_find = false;
+                auto rhs_vals = cond.rhs_vals;
+                for(auto& rhs_val : rhs_vals){
+                    if (eval_condition(lhs_data, lhs_col_meta->type, CompOp::OP_EQ , rhs_val)) {
+                        is_find = true;
+                        break;
+                    }
+                }
+                if(!is_find){
+                    return false;
+                }
+                continue;
+            }
+            
             if (cond.is_rhs_val) {
                 // 右边是常量值
                 if (!eval_condition(lhs_data, lhs_col_meta->type, cond.op, cond.rhs_val)) {

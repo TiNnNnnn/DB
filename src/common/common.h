@@ -74,7 +74,7 @@ struct Value {
     }
 };
 
-enum CompOp { OP_EQ, OP_NE, OP_LT, OP_GT, OP_LE, OP_GE };
+enum CompOp { OP_EQ, OP_NE, OP_LT, OP_GT, OP_LE, OP_GE , IN };
 
 //聚合函数
 struct AggregateExpr{
@@ -88,14 +88,17 @@ struct AggregateExpr{
 
 
 
-struct Condition {
+struct Condition { 
+    bool is_lhs_col;  // true is right-hand side is a col (not a aggregation)
     AggregateExpr lhs_agg;  //left-agg side aggregation
     TabCol lhs_col;   // left-hand side column
+    
     CompOp op;        // comparison operator
-    bool is_lhs_col;  // true is right-hand side is a col (not a aggregation)
+   
     bool is_rhs_val;  // true if right-hand side is a value (not a column)
     TabCol rhs_col;   // right-hand side column
     Value rhs_val;    // right-hand side value
+    std::vector<Value>rhs_vals; 
 };
 
 struct SetClause {

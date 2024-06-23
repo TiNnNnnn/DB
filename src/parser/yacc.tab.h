@@ -34,8 +34,8 @@
 /* Undocumented macros, especially those whose name start with YY_,
    are private implementation details.  Do not rely on them.  */
 
-#ifndef YY_YY_HOME_YYK_DB2024_SRC_PARSER_YACC_TAB_H_INCLUDED
-# define YY_YY_HOME_YYK_DB2024_SRC_PARSER_YACC_TAB_H_INCLUDED
+#ifndef YY_YY_YACC_TAB_H_INCLUDED
+# define YY_YY_YACC_TAB_H_INCLUDED
 /* Debug traces.  */
 #ifndef YYDEBUG
 # define YYDEBUG 0
@@ -81,23 +81,25 @@ extern int yydebug;
     TXN_ROLLBACK = 287,
     ENABLE_NESTLOOP = 288,
     ENABLE_SORTMERGE = 289,
-    AS = 290,
-    LEQ = 291,
-    NEQ = 292,
-    GEQ = 293,
-    T_EOF = 294,
-    COUNT = 295,
-    SUM = 296,
-    AVG = 297,
-    MIN = 298,
-    MAX = 299,
-    GROUP = 300,
-    HAVING = 301,
-    IDENTIFIER = 302,
-    VALUE_STRING = 303,
-    VALUE_INT = 304,
-    VALUE_FLOAT = 305,
-    VALUE_BOOL = 306
+    IN = 290,
+    AS = 291,
+    LEQ = 292,
+    NEQ = 293,
+    GEQ = 294,
+    T_EOF = 295,
+    COUNT = 296,
+    SUM = 297,
+    AVG = 298,
+    MIN = 299,
+    MAX = 300,
+    GROUP = 301,
+    HAVING = 302,
+    IDENTIFIER = 303,
+    VALUE_STRING = 304,
+    OP_IN = 305,
+    VALUE_INT = 306,
+    VALUE_FLOAT = 307,
+    VALUE_BOOL = 308
   };
 #endif
 
@@ -121,4 +123,4 @@ struct YYLTYPE
 
 int yyparse (void);
 
-#endif /* !YY_YY_HOME_YYK_DB2024_SRC_PARSER_YACC_TAB_H_INCLUDED  */
+#endif /* !YY_YY_YACC_TAB_H_INCLUDED  */

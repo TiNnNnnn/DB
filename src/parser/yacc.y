@@ -23,6 +23,7 @@ using namespace ast;
 // keywords
 %token SHOW TABLES CREATE TABLE DROP DESC INSERT INTO VALUES DELETE FROM ASC ORDER BY WHERE UPDATE SET SELECT INT CHAR FLOAT INDEX AND JOIN EXIT HELP TXN_BEGIN TXN_COMMIT TXN_ABORT TXN_ROLLBACK ENABLE_NESTLOOP ENABLE_SORTMERGE
 // non-keywords
+%token IN 
 %token AS
 %token LEQ NEQ GEQ T_EOF
 %token COUNT SUM AVG MIN MAX 
@@ -30,7 +31,7 @@ using namespace ast;
 %token HAVING
 
 // type-specific tokens
-%token <sv_str> IDENTIFIER VALUE_STRING
+%token <sv_str> IDENTIFIER VALUE_STRING OP_IN  
 %token <sv_int> VALUE_INT
 %token <sv_float> VALUE_FLOAT
 %token <sv_bool> VALUE_BOOL
@@ -277,6 +278,10 @@ condition:
     | subquery op expr
     {
         $$ = std::make_shared<BinaryExpr>($1, $2, $3);
+    }
+    | expr IN subquery
+    {
+        $$ = std::make_shared<BinaryExpr>($1,SvCompOp::SV_OP_IN,$3);
     }
     ;
 
