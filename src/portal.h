@@ -129,16 +129,19 @@ class Portal
             case PORTAL_DML_WITHOUT_SELECT:
             {
                 ql->run_dml(std::move(portal->root));
+                return std::vector<std::vector<std::string>>();
                 break;
             }
             case PORTAL_MULTI_QUERY:
             {
                 ql->run_mutli_query(portal->plan, context);
+                return std::vector<std::vector<std::string>>();
                 break;
             }
             case PORTAL_CMD_UTILITY:
             {
                 ql->run_cmd_utility(portal->plan, txn_id, context);
+                return std::vector<std::vector<std::string>>();
                 break;
             }
             default:
