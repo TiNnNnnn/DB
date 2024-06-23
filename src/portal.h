@@ -51,8 +51,6 @@ class Portal
 {
    private:
     SmManager *sm_manager_;
-    
-
    public:
     Portal(SmManager *sm_manager) : sm_manager_(sm_manager){}
     ~Portal(){}

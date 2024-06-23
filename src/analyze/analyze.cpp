@@ -263,13 +263,26 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
     for (auto &e : sv_conds) {
         Condition cond;
 
-        //lhs is Col
+        //检查cond左右expr,并进行规范化处理
+        if(auto l_expr = std::dynamic_pointer_cast<ast::Value>(e->lhs)){
+            if(auto r_expr = std::dynamic_pointer_cast<ast::Col>(e->rhs)){
+                std::swap(e->lhs,e->rhs);
+            }else if(auto r_expr = std::dynamic_pointer_cast<ast::AggregateExpr>(e->rhs)){
+                std::swap(e->lhs,e->rhs);
+            }
+        }else if(auto l_expr = std::dynamic_pointer_cast<ast::Subquery>(e->lhs)){
+            if(auto r_expr = std::dynamic_pointer_cast<ast::Col>(e->rhs)){
+                std::swap(e->lhs,e->rhs);
+            }
+        }
+
+        //特殊处理IN子句
         if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)){
             cond.is_lhs_col = true;
             if(tables.size()>1)cond.lhs_col = {expr->tab_name, expr->col_name};
             else cond.lhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
 
-            //特殊处理IN子句
+           
             if(e->op == ast::SvCompOp::SV_OP_IN){
                 std::vector<ColMeta> all_cols;
                 get_all_cols(tables, all_cols);
@@ -429,15 +442,12 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                         }
                     }
                 }
-
                 // 优化器
                 std::shared_ptr<Plan> plan = optimizer->plan_query(query, context);
                 // 执行器
                 std::shared_ptr<PortalStmt> portalStmt = portal->start(plan, context);
                 auto ret = portal->run(portalStmt, ql_manager.get(), &txn_id, context,true);
                 portal->drop();
-                
-                
                 if( ret.size() != 1){
                     throw InternalError("Scalar Subquery's return value must be single value");
                 }
@@ -454,13 +464,12 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 }else{
                     r_val.set_str(r_str);
                 }
-
                 cond.is_lhs_col = true;
                 cond.is_rhs_val = true;
                 cond.lhs_col = l_tab_col;
                 cond.rhs_val = r_val;
             }
-        //rhs is Aggregate
+        //lhs is Aggregate
         }else if(auto arg = std::dynamic_pointer_cast<ast::AggregateExpr>(e->lhs)){
             std::vector<ColMeta> all_cols;
             get_all_cols(tables, all_cols);
@@ -509,9 +518,8 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 throw InternalError("aggregation right cond must be value");
             }
         }else{
-            //ERROR
+            throw InternalError("failed to parse cond");
         }
-      
         conds.push_back(cond);
     }
 }
