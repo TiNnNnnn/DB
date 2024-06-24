@@ -41,7 +41,6 @@ class DeleteExecutor : public AbstractExecutor {
             // 获取要删除的记录
             std::unique_ptr<RmRecord> rec = fh_->get_record(rid, context_);
             if(!rec) return nullptr;
-            
             // 删除记录
             fh_->delete_record(rid, context_);
             // 更新索引

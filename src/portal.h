@@ -154,7 +154,6 @@ class Portal
     // 清空资源
     void drop(){}
 
-
     std::unique_ptr<AbstractExecutor> convert_plan_executor(std::shared_ptr<Plan> plan, Context *context)
     {
         if(auto x = std::dynamic_pointer_cast<ProjectionPlan>(plan)){
