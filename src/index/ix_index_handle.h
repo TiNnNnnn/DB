@@ -36,7 +36,7 @@ inline int ix_compare(const char *a, const char *b, ColType type, int col_len) {
             throw InternalError("Unexpected data type");
     }
 }
-//复合索引比较 (最左匹配)
+//复合索引比较 (最左匹配) （TODO:has bug ）
 inline int ix_compare(const char* a, const char* b, const std::vector<ColType>& col_types, const std::vector<int>& col_lens) {
     int offset = 0;
     for(size_t i = 0; i < col_types.size(); ++i) {
@@ -226,8 +226,6 @@ class IxIndexHandle {
     void update_root_page_no(page_id_t root) { file_hdr_->root_page_ = root; }
 
     bool is_empty() const { return file_hdr_->root_page_ == IX_NO_PAGE; }
-
-   
 
     IxNodeHandle *create_node();
 

@@ -89,14 +89,17 @@ class IxManager {
         fhdr->update_tot_len();
         
         char* data = new char[fhdr->tot_len_];
+        //将file_hdr进行序列化
         fhdr->serialize(data);
-
+        //将file_hdr写入 idx file 的第0页
         disk_manager_->write_page(fd, IX_FILE_HDR_PAGE, data, fhdr->tot_len_);
 
         char page_buf[PAGE_SIZE];  // 在内存中初始化page_buf中的内容，然后将其写入磁盘
         memset(page_buf, 0, PAGE_SIZE);
         // 注意leaf header页号为1，也标记为叶子结点，其前一个/后一个叶子均指向root node
-        // Create leaf list header page and write to file
+
+
+        // Create leaf list header page and write to file （管理叶子节点链表）
         {
             memset(page_buf, 0, PAGE_SIZE);
             auto phdr = reinterpret_cast<IxPageHdr *>(page_buf);
@@ -110,6 +113,7 @@ class IxManager {
             };
             disk_manager_->write_page(fd, IX_LEAF_HEADER_PAGE, page_buf, PAGE_SIZE);
         }
+
         // 注意root node页号为2，也标记为叶子结点，其前一个/后一个叶子均指向leaf header
         // Create root node and write to file
         {
@@ -126,9 +130,7 @@ class IxManager {
             // Must write PAGE_SIZE here in case of future fetch_node()
             disk_manager_->write_page(fd, IX_INIT_ROOT_PAGE, page_buf, PAGE_SIZE);
         }
-
         disk_manager_->set_fd2pageno(fd, IX_INIT_NUM_PAGES - 1);  // DEBUG
-
         // Close index file
         disk_manager_->close_file(fd);
     }
