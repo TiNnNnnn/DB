@@ -21,6 +21,7 @@ See the Mulan PSL v2 for more details. */
 #include "execution/executor_update.h"
 #include "index/ix.h"
 #include "record_printer.h"
+#include "common/common.h"
 
 // 目前的索引匹配规则为：完全匹配索引字段，且全部为单点查询，不会自动调整where条件的顺序
 bool Planner::get_index_cols(std::string tab_name, std::vector<Condition> curr_conds, std::vector<std::string>& index_col_names) {
@@ -43,13 +44,11 @@ bool Planner::get_index_cols(std::string tab_name, std::vector<Condition> curr_c
 
     // 遍历所有索引，找到匹配最多条件的索引
     for (const auto& index : tab_idxs) {
-        //std::vector<std::string> matched_index_cols;
         size_t match_count = 0;
         bool full_match = true;
 
         for (const auto& idx_col : index.cols) {
             if (col_to_cond_map.find(idx_col.name) != col_to_cond_map.end()) {
-                //matched_index_cols.push_back(idx_col.name);
                 match_count++;
             } else {
                 full_match = false;
@@ -75,16 +74,8 @@ bool Planner::get_index_cols(std::string tab_name, std::vector<Condition> curr_c
         for(auto e:best_idx.cols)index_col_names.push_back(e.name);
         return true;
     }
-   
-
-    // for(auto& cond: curr_conds) {
-    //     if(cond.is_rhs_val && cond.op == OP_EQ && cond.lhs_col.tab_name.compare(tab_name) == 0)
-    //         index_col_names.push_back(cond.lhs_col.col_name);
-    // }
-    // TabMeta& tab = sm_manager_->db_.get_table(tab_name);
-    // if(tab.is_index(index_col_names)) return true;
-    // return false;
 }
+
 
 /**
  * @brief 表算子条件谓词生成
@@ -96,10 +87,8 @@ bool Planner::get_index_cols(std::string tab_name, std::vector<Condition> curr_c
  * @param tab_names 表名
  * @return std::vector<Condition>
  */
-std::vector<Condition> pop_conds(std::vector<Condition> &conds, std::string tab_names) {
-    // auto has_tab = [&](const std::string &tab_name) {
-    //     return std::find(tab_names.begin(), tab_names.end(), tab_name) != tab_names.end();
-    // };
+std::vector<Condition> Planner::pop_conds(std::vector<Condition> &conds, std::string tab_names) {
+
     std::vector<Condition> solved_conds;
     auto it = conds.begin();
     while (it != conds.end()) {
@@ -157,15 +146,66 @@ int push_conds(Condition *cond, std::shared_ptr<Plan> plan)
     return false;
 }
 
-std::shared_ptr<Plan> pop_scan(int *scantbl, std::string table, std::vector<std::string> &joined_tables, 
+
+
+
+//获取当前table的scan任务
+//fix:重新检查是否可以利用索引
+std::shared_ptr<Plan> Planner::pop_scan(int *scantbl, TabCol col, std::vector<std::string> &joined_tables, 
                 std::vector<std::shared_ptr<Plan>> plans)
 {
     for (size_t i = 0; i < plans.size(); i++) {
         auto x = std::dynamic_pointer_cast<ScanPlan>(plans[i]);
-        if(x->tab_name_.compare(table) == 0)
+        if(x->tab_name_.compare(col.tab_name) == 0)
         {
             scantbl[i] = 1;
             joined_tables.emplace_back(x->tab_name_);
+
+            if(plans[i]->tag == T_IndexScan){
+                return plans[i];
+            }
+
+            // 检查是否存在索引并获取索引列名原则
+            std::vector<std::string> index_col_names;
+            //判定是否存在索引，且符合最左匹配
+            auto& tab_meta = sm_manager_->db_.get_table(x->tab_name_);
+            auto& tab_idxs = tab_meta.indexes;
+
+            size_t max_match_count = 0;
+            IndexMeta best_idx;
+
+            for(auto& index : tab_idxs){
+                size_t match_count = 0;
+                bool full_match = true;
+
+                for (const auto& idx_col : index.cols) {
+                    if (col.col_name == idx_col.name) {
+                        match_count++;
+                    } else {
+                        full_match = false;
+                        break;
+                    }
+                }
+
+                if (match_count > max_match_count) {
+                    max_match_count = match_count;
+                    best_idx = index;
+
+                    // 如果找到了完全匹配的索引，直接返回
+                    if (full_match) {
+                        //index_col_names = index;
+                        for(auto e:best_idx.cols)index_col_names.push_back(e.name);
+                        return std::make_shared<ScanPlan>(T_IndexScan, sm_manager_, col.tab_name, x->fed_conds_, index_col_names);
+                    }
+                }
+            }
+            
+            if (max_match_count == 0) {
+                return plans[i];
+            } else {
+                for(auto e:best_idx.cols)index_col_names.push_back(e.name);
+                 return std::make_shared<ScanPlan>(T_IndexScan, sm_manager_, col.tab_name, x->fed_conds_, index_col_names);
+            }
             return plans[i];
         }
     }
@@ -191,6 +231,7 @@ std::shared_ptr<Plan> Planner::physical_optimization(std::shared_ptr<Query> quer
 
     //处理Groupby
     plan = generate_groupby_plan(query,std::move(plan));
+
     // 处理orderby
     plan = generate_sort_plan(query, std::move(plan)); 
 
@@ -205,17 +246,17 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
     // Scan table , 生成表算子列表tab_nodes
     // 初始化一个与表数量相同的表扫描计划列表
     std::vector<std::shared_ptr<Plan>> table_scan_executors(tables.size());
+    std::vector<bool>table_index_exists(tables.size());
 
     // 遍历每个表，生成相应的扫描计划
     for (size_t i = 0; i < tables.size(); i++) {
         // 从查询条件中获取当前表相关的条件
         auto curr_conds = pop_conds(query->conds, tables[i]);
-        // int index_no = get_indexNo(tables[i], curr_conds);
         // 检查是否存在索引并获取索引列名原则
         std::vector<std::string> index_col_names;
-        
         //判定是否存在索引，且符合最左匹配
         bool index_exist = get_index_cols(tables[i], curr_conds, index_col_names);
+        table_index_exists[i] = index_exist;
         if (index_exist == false) {  // 该表没有索引
             index_col_names.clear();
             table_scan_executors[i] = 
@@ -230,6 +271,7 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
     {
         return table_scan_executors[0];
     }
+
     // 获取where条件 （join条件）
     auto conds = std::move(query->conds);
     std::shared_ptr<Plan> table_join_executors;
@@ -244,29 +286,60 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
     if(conds.size() >= 1)
     {
         // 有连接条件
-
         // 根据连接条件，生成第一层join
         std::vector<std::string> joined_tables(tables.size());
         auto it = conds.begin();
         while (it != conds.end()) {
             std::shared_ptr<Plan> left , right;
-            left = pop_scan(scantbl, it->lhs_col.tab_name, joined_tables, table_scan_executors);
-            right = pop_scan(scantbl, it->rhs_col.tab_name, joined_tables, table_scan_executors);
+            left = pop_scan(scantbl, it->lhs_col, joined_tables, table_scan_executors);
+            right = pop_scan(scantbl, it->rhs_col, joined_tables, table_scan_executors);
             std::vector<Condition> join_conds{*it};
+
+            set_enable_nestedloop_join(g_enable_nestloop);
+            set_enable_sortmerge_join(g_enable_sortmerge);
+
             //建立join
             // 判断使用哪种join方式
-            if(enable_nestedloop_join && enable_sortmerge_join) {
-                // 默认nested loop join
+            if(enable_nestedloop_join && enable_sortmerge_join) {// 默认nested loop join
                 table_join_executors = std::make_shared<JoinPlan>(T_NestLoop, std::move(left), std::move(right), join_conds);
             } else if(enable_nestedloop_join) {
                 table_join_executors = std::make_shared<JoinPlan>(T_NestLoop, std::move(left), std::move(right), join_conds);
             } else if(enable_sortmerge_join) {
-                table_join_executors = std::make_shared<JoinPlan>(T_SortMerge, std::move(left), std::move(right), join_conds);
+
+                std::vector<TabCol> left_cols;
+                auto left_col = join_conds[0].lhs_col;
+                left_cols.push_back(left_col);
+
+                std::shared_ptr<Plan> sorted_left , sorted_right;
+                if(left->tag == T_SeqScan){
+                    //left join cond col 
+                    sorted_left = std::make_shared<SortPlan>(T_Sort, std::move(left), left_cols, false);
+                    assert(sorted_left);
+                }else if(left->tag == T_IndexScan){
+                    //nothing to do
+                    sorted_left = std::move(left);
+                }else{
+                    throw InternalError("bad plan while build sort merge join");
+                }
+
+                std::vector<TabCol> right_cols;
+                auto right_col = join_conds[0].rhs_col;
+                right_cols.push_back(right_col);
+
+                if(right->tag == T_SeqScan){
+                    sorted_right = std::make_shared<SortPlan>(T_Sort, std::move(right), right_cols, false);
+                    assert(sorted_right);
+                }else if(right->tag == T_IndexScan){
+                    //no thing to do
+                    sorted_left = std::move(right);
+                }else{
+                    throw InternalError("bad plan while build sort merge join");
+                }
+                table_join_executors = std::make_shared<JoinPlan>(T_SortMerge, std::move(sorted_left), std::move(sorted_right), join_conds);
             } else {
                 // error
                 throw RMDBError("No join executor selected!");
             }
-
             // table_join_executors = std::make_shared<JoinPlan>(T_NestLoop, std::move(left), std::move(right), join_conds);
             it = conds.erase(it);
             break;
@@ -278,10 +351,10 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
             std::shared_ptr<Plan> right_need_to_join_executors = nullptr;
             bool isneedreverse = false;
             if (std::find(joined_tables.begin(), joined_tables.end(), it->lhs_col.tab_name) == joined_tables.end()) {
-                left_need_to_join_executors = pop_scan(scantbl, it->lhs_col.tab_name, joined_tables, table_scan_executors);
+                left_need_to_join_executors = pop_scan(scantbl, it->lhs_col, joined_tables, table_scan_executors);
             }
             if (std::find(joined_tables.begin(), joined_tables.end(), it->rhs_col.tab_name) == joined_tables.end()) {
-                right_need_to_join_executors = pop_scan(scantbl, it->rhs_col.tab_name, joined_tables, table_scan_executors);
+                right_need_to_join_executors = pop_scan(scantbl, it->rhs_col, joined_tables, table_scan_executors);
                 isneedreverse = true;
             } 
 
@@ -343,7 +416,6 @@ std::shared_ptr<Plan> Planner::generate_groupby_plan(std::shared_ptr<Query> quer
                                         query->a_exprs,query->cols);
 }
 
-
 std::shared_ptr<Plan> Planner::generate_sort_plan(std::shared_ptr<Query> query, std::shared_ptr<Plan> plan)
 {
     auto x = std::dynamic_pointer_cast<ast::SelectStmt>(query->parse);
@@ -351,26 +423,9 @@ std::shared_ptr<Plan> Planner::generate_sort_plan(std::shared_ptr<Query> query, 
     if(!x->has_sort) {
         return plan;
     }
-    std::vector<std::string> tables = query->tables;
-
-    //获取涉及的tables的所有列信息
-    std::vector<ColMeta> all_cols;
-    for (auto &sel_tab_name : tables) {
-        // 这里db_不能写成get_db(), 注意要传指针
-        const auto &sel_tab_cols = sm_manager_->db_.get_table(sel_tab_name).cols;
-        all_cols.insert(all_cols.end(), sel_tab_cols.begin(), sel_tab_cols.end());
-    }
-
-    //获取待排序列
-    TabCol sel_col;
-    for (auto &col : all_cols) {
-        if(col.name.compare(x->order->cols->col_name) == 0 )
-        sel_col = {.tab_name = col.tab_name, .col_name = col.name};
-    }
-    return std::make_shared<SortPlan>(T_Sort, std::move(plan), sel_col, 
-                                    x->order->orderby_dir == ast::OrderBy_DESC);
+    return std::make_shared<SortPlan>(T_Sort, std::move(plan), query->order_expr.cols, 
+                                    query->order_expr.dir == OrderBy_Dir::OP_DESC);
 }
-
 
 /**
  * @brief select plan 生成

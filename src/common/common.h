@@ -18,7 +18,6 @@ See the Mulan PSL v2 for more details. */
 #include "defs.h"
 #include "record/rm_defs.h"
 
-
 struct TabCol {
     std::string tab_name;
     std::string col_name;
@@ -27,8 +26,6 @@ struct TabCol {
         return std::make_pair(x.tab_name, x.col_name) < std::make_pair(y.tab_name, y.col_name);
     }
 };
-
-
 
 struct Value {
     ColType type;  // type of value
@@ -75,6 +72,7 @@ struct Value {
 };
 
 enum CompOp { OP_EQ, OP_NE, OP_LT, OP_GT, OP_LE, OP_GE , IN };
+enum OrderBy_Dir { OP_DEFAULT,OP_ASC,OP_DESC};
 
 //聚合函数
 struct AggregateExpr{
@@ -108,9 +106,21 @@ struct SetClause {
 
 
 
+//join参数（默认使用enable_sortmerge）
+extern bool g_enable_nestloop;
+extern bool g_enable_sortmerge;
+
+
+
 //分组函数
 struct GroupByExpr{
     std::vector<std::string> tab_name;
     std::vector<TabCol> cols;  // 列名列表
     std::vector<Condition> havingClause;   // HAVING 子句中的条件列表
+};
+
+//order by 
+struct OrderByExpr{
+    std::vector<TabCol> cols;
+    OrderBy_Dir dir;
 };

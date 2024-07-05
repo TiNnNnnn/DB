@@ -30,6 +30,9 @@ See the Mulan PSL v2 for more details. */
 static bool should_exit = false;
 std::string global_db_name;
 
+bool g_enable_nestloop = true;
+bool g_enable_sortmerge = false;
+
 // 构建全局所需的管理器对象
 auto disk_manager = std::make_unique<DiskManager>();
 auto buffer_pool_manager = std::make_unique<BufferPoolManager>(BUFFER_POOL_SIZE, disk_manager.get());

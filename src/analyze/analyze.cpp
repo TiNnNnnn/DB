@@ -139,6 +139,33 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
             //check_clause(query->tables, gb_expr.havingClause);
             query->gb_expr = gb_expr;
         }
+
+        //处理order by
+        if(x->order){
+            auto sel_cols = x->order->cols;
+            auto dir = x->order->orderby_dir;
+
+            OrderBy_Dir op_dir;
+
+            if(dir == ast::OrderBy_DEFAULT){
+                op_dir = OrderBy_Dir::OP_ASC;
+            }else if(dir == ast::OrderBy_ASC){
+                op_dir = OrderBy_Dir::OP_ASC;
+            }else if(dir == ast::OrderBy_DESC){
+                op_dir = OrderBy_Dir::OP_DESC;
+            }
+
+            for (auto col : sel_cols) {
+                TabCol tab_col = {get_tb_name(query->tables,col->col_name),col->col_name};
+                check_column(all_cols, tab_col);  // 列元数据校验
+
+                query->order_expr.cols.push_back(tab_col);
+            }
+            query->order_expr.dir = op_dir;
+            
+        }
+
+
     } else if (auto x = std::dynamic_pointer_cast<ast::UpdateStmt>(parse)) {
         // 处理表名
         query->tables.push_back(x->tab_name);
@@ -198,7 +225,13 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
         if (!sm_manager_->db_.is_table(x->tab_name)) {
             throw TableNotFoundError(x->tab_name);
         }
-    } 
+    } else if (auto x = std::dynamic_pointer_cast<ast::SetStmt>(parse)){
+        if(x->set_knob_type_ == ast::EnableNestLoop){
+            g_enable_nestloop = x->bool_val_;
+        }else if (x->set_knob_type_ == ast::EnableSortMerge){
+            g_enable_sortmerge = x->bool_val_;
+        }
+    }
     else {
         // do nothing
     }
@@ -248,7 +281,7 @@ TabCol Analyze::check_column(const std::vector<ColMeta> &all_cols, TabCol target
         }
     }
     return "";
- }
+}
 
 void Analyze::get_all_cols(const std::vector<std::string> &tab_names, std::vector<ColMeta> &all_cols) {
     for (auto &sel_tab_name : tab_names) {

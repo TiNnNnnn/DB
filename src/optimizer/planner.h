@@ -65,4 +65,8 @@ class Planner {
             {ast::SV_TYPE_INT, TYPE_INT}, {ast::SV_TYPE_FLOAT, TYPE_FLOAT}, {ast::SV_TYPE_STRING, TYPE_STRING}};
         return m.at(sv_type);
     }
+
+    std::vector<Condition> pop_conds(std::vector<Condition> &conds, std::string tab_names);
+    std::shared_ptr<Plan> pop_scan(int *scantbl, TabCol col, std::vector<std::string> &joined_tables, 
+                std::vector<std::shared_ptr<Plan>> plans);
 };

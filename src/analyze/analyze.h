@@ -40,6 +40,8 @@ class Query{
     std::vector<AggregateExpr> a_exprs;
     //分组函数（包含having）
     GroupByExpr gb_expr;
+    //排序函数
+    OrderByExpr order_expr;
 
     Query(){}
 

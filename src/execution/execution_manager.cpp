@@ -192,7 +192,6 @@ std::vector<std::vector<std::string>> QlManager::select_from(std::unique_ptr<Abs
         outfile << "\n";
     }
    
-
     std::vector<std::vector<std::string>>rets;
 
     // Print records
