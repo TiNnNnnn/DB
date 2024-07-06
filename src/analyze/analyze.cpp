@@ -412,6 +412,14 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 cond.is_rhs_val = false;
                 if(tables.size()>1)cond.rhs_col = {expr->tab_name, expr->col_name};
                 else cond.rhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
+
+                if(tables.size()==2){
+                    if(tables[0] == cond.rhs_col.tab_name){
+                        auto temp_col = cond.lhs_col;
+                        cond.lhs_col = cond.rhs_col;
+                        cond.rhs_col = temp_col;
+                    }
+                }
             } else if (auto sub_query = std::dynamic_pointer_cast<ast::Subquery>(e->rhs)){
                 //右边是标量子查询 （TODO: 子查询可能在左边）
                 auto disk_manager = std::make_unique<DiskManager>();

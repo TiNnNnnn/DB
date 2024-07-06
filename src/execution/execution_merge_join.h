@@ -126,6 +126,7 @@ public:
         AbstractExecutor* output_right = right_.get();
         sort_output(output_left);
         sort_output(output_right);
+
         output_left = output_right = nullptr;
 
         left_buffer_.clear();

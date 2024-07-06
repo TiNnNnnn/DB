@@ -335,6 +335,9 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
                 }else{
                     throw InternalError("bad plan while build sort merge join");
                 }
+
+                
+
                 table_join_executors = std::make_shared<JoinPlan>(T_SortMerge, std::move(sorted_left), std::move(sorted_right), join_conds);
             } else {
                 // error
