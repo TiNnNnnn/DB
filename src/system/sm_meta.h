@@ -184,6 +184,8 @@ class DbMeta {
    public:
     // DbMeta(std::string name) : name_(name) {}
 
+    std::string get_db_name(){return name_;}
+
     /* 判断数据库中是否存在指定名称的表 */
     bool is_table(const std::string &tab_name) const { return tabs_.find(tab_name) != tabs_.end(); }
 

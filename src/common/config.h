@@ -52,3 +52,5 @@ static const std::string LOG_FILE_NAME = "db.log";
 static const std::string REPLACER_TYPE = "LRU";
 
 static const std::string DB_META_NAME = "db.meta";
+
+static const std::string sorted_output_file = "sorted_results.txt";

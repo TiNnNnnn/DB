@@ -180,13 +180,13 @@ class Portal
             }else if(plan->tag == T_SortMerge){
                 join = std::make_unique<MergeJoinExecutor>(
                                 std::move(left), 
-                                std::move(right), std::move(x->conds_));
+                                std::move(right), std::move(x->conds_),sm_manager_);
             }
             
             return join;
         } else if(auto x = std::dynamic_pointer_cast<SortPlan>(plan)) {
             return std::make_unique<SortExecutor>(convert_plan_executor(x->subplan_, context), 
-                                            x->sel_cols_, x->is_desc_);
+                                            x->sel_cols_, x->is_desc_,sm_manager_);
         } else if(auto x = std::dynamic_pointer_cast<GroupByPlan>(plan)){
             return std::make_unique<GroupByExecutor>(convert_plan_executor(x->subplan_, context),
                                             x->group_by_cols_,x->having_clauses_,x->agg_exprs_,x->sel_cols_);

@@ -1,15 +1,19 @@
 #pragma once
+
 #include "execution_defs.h"
 #include "execution_manager.h"
 #include "executor_abstract.h"
 #include "index/ix.h"
 #include "system/sm.h"
 
-//归并连接算法 (left 和 right 已经按照cols进行了排序)
 
+static std::string left_temp_dir = "left_temp_dir";
+static std::string right_temp_dir = "right_temp_dir";
+//归并连接算法 (left 和 right 已经按照cols进行了排序)
 //TODO：如何处理非等值连接条件下的归并连接，可能退化为nsetloop_join
 class MergeJoinExecutor : public AbstractExecutor {
 private:
+
     std::unique_ptr<AbstractExecutor> left_;    // 左儿子节点（需要join的表）
     std::unique_ptr<AbstractExecutor> right_;   // 右儿子节点（需要join的表）
     size_t len_;                                // join后获得的每条记录的长度
@@ -21,7 +25,6 @@ private:
     std::unique_ptr<RmRecord> left_tuple_;      // 左子执行器当前的元组
     std::unique_ptr<RmRecord> right_tuple_;     // 右子执行器当前的元组
 
-
     std::vector<std::unique_ptr<RmRecord>> left_buffer_;  // 缓存当前匹配的左表记录
     std::vector<std::unique_ptr<RmRecord>> right_buffer_; // 缓存当前匹配的右表记录
     int left_index_;  // 当前左表缓存的索引
@@ -30,9 +33,15 @@ private:
     RmRecord* temp_left_tuple_;
     RmRecord* temp_right_tuple_;
 
+    SmManager *sm_manager_;
+    std::fstream sort_out_file;
+    TabMeta tab_meta;
+    std::string dir;
+
+
 public:
     MergeJoinExecutor(std::unique_ptr<AbstractExecutor> left, std::unique_ptr<AbstractExecutor> right, 
-                            std::vector<Condition> conds){
+                            std::vector<Condition> conds,SmManager* sm_manager){
         left_ = std::move(left);
         right_ = std::move(right);
         //join之后每条记录的长度
@@ -47,19 +56,113 @@ public:
         cols_.insert(cols_.end(), right_cols.begin(), right_cols.end());
         isend = false;
         fed_conds_ = std::move(conds);
+
+        sm_manager_ = sm_manager;
+        dir = sm_manager_->db_.get_db_name() + '/';
+    }
+
+    void sort_output( AbstractExecutor* output){
+
+        sort_out_file.open(dir + sorted_output_file, std::ios::out | std::ios::app);
+        //写入table header
+        tab_meta = sm_manager_->db_.get_table(output->cols()[0].tab_name);
+        std::vector<std::string> captions;
+        captions.reserve(tab_meta.cols.size());
+        for(auto& col : tab_meta.cols){
+            captions.push_back(col.name);
+        }
+        sort_out_file << "|";
+        for(int i = 0; i < captions.size(); ++i) {
+            sort_out_file << " " << captions[i] << " |";
+        }
+        sort_out_file << "\n";
+        
+        struct stat info;
+        if (stat((dir+"temp_output_dir").c_str(), &info) == 0 && (info.st_mode & S_IFDIR)) {
+            //exist
+        }else{
+            mkdir((dir+"temp_output_dir").c_str(),0755);
+        }
+        
+        if (chdir((dir+"temp_output_dir").c_str()) < 0) {
+             throw UnixError();
+        }
+
+        for(output->beginTuple();!output->is_end();output->nextTuple()){
+            auto current_tuple = output->Next();
+            int cols_offset = 0;
+            std::vector<std::string> columns;
+
+            for (auto &col : tab_meta.cols) {
+                    std::string col_str;
+                    char *rec_buf = current_tuple->data + col.offset;
+                    if (col.type == TYPE_INT) {
+                        col_str = std::to_string(*(int *)rec_buf);
+                    } else if (col.type == TYPE_FLOAT) {
+                        col_str = std::to_string(*(float *)rec_buf);
+                    } else if (col.type == TYPE_STRING) {
+                        col_str = std::string((char *)rec_buf, col.len);
+                        col_str.resize(strlen(col_str.c_str()));
+                    }
+                    cols_offset += col.offset;
+                    columns.push_back(col_str);
+            }
+            sort_out_file << "|";
+            for(int i = 0; i < columns.size(); ++i) {
+                sort_out_file << " " << columns[i] << " |";
+            }
+            sort_out_file << "\n";
+        }
+        sort_out_file.close();
+        if (chdir("../..") < 0) {
+            throw UnixError();
+        }
     }
 
     void beginTuple() override {
+
+        //将中间排序结果sort_out_file.txt
+        AbstractExecutor* output_left = left_.get();
+        AbstractExecutor* output_right = right_.get();
+        sort_output(output_left);
+        sort_output(output_right);
+        output_left = output_right = nullptr;
 
         left_buffer_.clear();
         right_buffer_.clear();
         left_index_ = 0;
         right_index_ = 0;
 
-        left_->beginTuple(); 
+        struct stat info;
+        if (stat((dir+left_temp_dir).c_str(), &info) == 0 && (info.st_mode & S_IFDIR)) {
+            //exist
+        }else{
+            mkdir((dir+left_temp_dir).c_str(),0755);
+        }
+
+        if (stat((dir+right_temp_dir).c_str(), &info) == 0 && (info.st_mode & S_IFDIR)) {
+            //exist
+        }else{
+            mkdir((dir+right_temp_dir).c_str(),0755);
+        }
+
+        if (chdir((dir+left_temp_dir).c_str()) < 0) {
+             throw UnixError();
+        }
+        left_->beginTuple();
         left_tuple_ = left_->Next();
+        if (chdir("../..") < 0) {
+            throw UnixError();
+        }
+
+        if (chdir((dir+right_temp_dir).c_str()) < 0) {
+             throw UnixError();
+        }
         right_->beginTuple();
         right_tuple_ = right_->Next();
+        if (chdir("../..") < 0) {
+            throw UnixError();
+        }
 
         while(true){
             if ((left_->is_end() || right_->is_end()) && (left_index_ == int(left_buffer_.size()))) {
@@ -67,18 +170,24 @@ public:
                 return;
             }
             int cmp = 0;
+
             if(left_tuple_ && right_tuple_)
                 cmp = compareJoinKeys(left_tuple_, right_tuple_);
+
             if(cmp == 0 || left_index_ < int(left_buffer_.size())){
                 if(right_buffer_.empty() || left_buffer_.empty()){
-
                     left_index_ = 0,right_index_ = 0;
 
                     temp_left_tuple_ = left_tuple_.get();
                     temp_right_tuple_ = right_tuple_.get(); 
 
+                    if (chdir((dir+left_temp_dir).c_str()) < 0) {throw UnixError();}
                     bufferMatchingLeftTuples();
+                    if (chdir("../..") < 0) {throw UnixError();}
+
+                    if (chdir((dir+right_temp_dir).c_str()) < 0) {throw UnixError();}
                     bufferMatchingRightTuples();
+                    if (chdir("../..") < 0) {throw UnixError();}
                 }
                 if (right_index_ < int(right_buffer_.size())) {
                     right_tuple_ = std::make_unique<RmRecord>(*right_buffer_[right_index_]);
@@ -99,20 +208,19 @@ public:
                     temp_left_tuple_= nullptr;
                     temp_right_tuple_=nullptr;
                 }
-                // if(matchConditions(left_tuple_,right_tuple_)){
-                //     break;
-                // }
                 break;
             }else if (cmp < 0) {
+                if (chdir((dir+left_temp_dir).c_str()) < 0) {throw UnixError();}
                 left_->nextTuple();
                 left_tuple_ = left_->Next();
+                if (chdir("../..") < 0) {throw UnixError();}
             } else {
+                if (chdir((dir+right_temp_dir).c_str()) < 0) {throw UnixError();}
                 right_->nextTuple();
                 right_tuple_ = right_->Next();
+                if (chdir("../..") < 0) {throw UnixError();}
             }
-
         }
-
     }
 
     void nextTuple() override {
@@ -124,16 +232,24 @@ public:
                 return;
             }
             int cmp = 0;
+
             if(left_tuple_ && right_tuple_)
                 cmp = compareJoinKeys(left_tuple_, right_tuple_);
 
             if(cmp == 0 || left_index_ < int(left_buffer_.size())){
                 if(right_buffer_.empty() || left_buffer_.empty()){
                     left_index_ = 0,right_index_ = 0;
+
                     temp_left_tuple_ = left_tuple_.get();
                     temp_right_tuple_ = right_tuple_.get(); 
+
+                    if (chdir((dir+left_temp_dir).c_str()) < 0) {throw UnixError();}
                     bufferMatchingLeftTuples();
+                    if (chdir("../..") < 0) {throw UnixError();}
+
+                    if (chdir((dir+right_temp_dir).c_str()) < 0) {throw UnixError();}
                     bufferMatchingRightTuples();
+                    if (chdir("../..") < 0) {throw UnixError();}
                 }
                 if (right_index_ < int(right_buffer_.size())) {
                     right_tuple_ = std::make_unique<RmRecord>(*right_buffer_[right_index_]);
@@ -155,12 +271,16 @@ public:
                     temp_right_tuple_=nullptr;
                 }
                 break;
-            }else if (cmp < 0) { // 左表的键较小
+            }else if (cmp < 0) {
+                if (chdir((dir+left_temp_dir).c_str()) < 0) {throw UnixError();}
                 left_->nextTuple();
                 left_tuple_ = left_->Next();
-            } else { // 右表的键较小
+                if (chdir("../..") < 0) {throw UnixError();}
+            } else {
+                if (chdir((dir+right_temp_dir).c_str()) < 0) {throw UnixError();}
                 right_->nextTuple();
                 right_tuple_ = right_->Next();
+                if (chdir("../..") < 0) {throw UnixError();}
             }
         }
     }
@@ -170,7 +290,15 @@ public:
         return joinTuples(left_tuple_, right_tuple_);        
     }
 
-    bool is_end() const override { return isend && left_index_ >= int(left_buffer_.size()); }
+    bool is_end() const override { 
+        if(isend && left_index_ >= int(left_buffer_.size())){
+            remove_directory(dir+"temp_output_dir");
+            remove_directory(dir+ left_temp_dir);
+            remove_directory(dir+right_temp_dir);
+            return true;
+        }
+        return false;
+    }
 
     size_t tupleLen() const override {
         return len_;
@@ -205,7 +333,6 @@ private:
             right_tuple_ = right_->Next();
         }
     }
-
 
     int compareJoinKeys(const std::unique_ptr<RmRecord> &left, const std::unique_ptr<RmRecord> &right) {
         for (const auto &cond : fed_conds_) {
@@ -327,6 +454,15 @@ private:
         memcpy(joined_data.get(), left->data, left_->tupleLen());
         memcpy(joined_data.get() + left_->tupleLen(), right->data, right_->tupleLen());
         return std::make_unique<RmRecord>(len_, joined_data.release());
+    }
+
+    void remove_directory(const std::string& dir) const{
+        std::string command = "rm -rf " + dir;
+        int result = system(command.c_str());
+
+        if (result) {
+            std::cerr << "Error deleting directory." << std::endl;
+        }
     }
 
 };

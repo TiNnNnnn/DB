@@ -39,8 +39,11 @@ class SortExecutor : public AbstractExecutor {
         std::function<bool(const std::pair<std::unique_ptr<RmRecord>, int>&, const std::pair<std::unique_ptr<RmRecord>, int>&)>
     > pq;
 
+    SmManager* sm_manager_;
+
+
    public:
-    SortExecutor(std::unique_ptr<AbstractExecutor> prev, std::vector<TabCol>sel_cols, bool is_desc) {
+    SortExecutor(std::unique_ptr<AbstractExecutor> prev, std::vector<TabCol>sel_cols, bool is_desc, SmManager* sm_manager) {
         prev_ = std::move(prev);
         project_cols_ = prev_->cols();
         for(auto& col : sel_cols){
@@ -65,9 +68,16 @@ class SortExecutor : public AbstractExecutor {
                 return false; // 当所有列都相等时，认为 a == b
             }
         );
+
+        sm_manager_ = sm_manager;
+        
     }
 
     void beginTuple() override { 
+        
+        temp_files.clear();
+        temp_file_idxs.clear();
+
         size_t buffer_size = 1024; // 假设内存缓冲区大小为1024条记录
         std::vector<std::unique_ptr<RmRecord>> buffer;
 
@@ -141,7 +151,7 @@ class SortExecutor : public AbstractExecutor {
         }
     }
 
-    std::unique_ptr<RmRecord> Next() override {
+    std::unique_ptr<RmRecord> Next() override {        
         return std::make_unique<RmRecord>(current_tuple);
     }
 
@@ -149,7 +159,15 @@ class SortExecutor : public AbstractExecutor {
         return project_cols_;
     }
     
-    virtual bool is_end() const{
+    virtual bool is_end() const override{
+        if(pq.empty() && current_tuple.size == 0){
+            for(auto name : temp_files){
+                // 删除文件
+                // if (std::remove(name.c_str()) != 0) {
+                //     throw InternalError("Failed to delete temp file: " + name);
+                // }
+            }
+        }
         return pq.empty() && current_tuple.size == 0;
     }
 

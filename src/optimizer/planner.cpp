@@ -331,7 +331,7 @@ std::shared_ptr<Plan> Planner::make_one_rel(std::shared_ptr<Query> query)
                     assert(sorted_right);
                 }else if(right->tag == T_IndexScan){
                     //no thing to do
-                    sorted_left = std::move(right);
+                    sorted_right = std::move(right);
                 }else{
                     throw InternalError("bad plan while build sort merge join");
                 }
