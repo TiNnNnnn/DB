@@ -127,7 +127,10 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
                 for(auto& cond : group_having_clauses->conditions){
                     if (auto expr = std::dynamic_pointer_cast<ast::Col>(cond->lhs)){
                         TabCol col;
-                        if(query->tables.size()>1)col = {expr->tab_name, expr->col_name};
+                        if(query->tables.size()>1){
+                            if(expr->tab_name != "")col = {expr->tab_name, expr->col_name};
+                            else col = {get_tb_name(query->tables,expr->col_name),expr->col_name};
+                        }
                         else col = {get_tb_name(query->tables,expr->col_name),expr->col_name};
                         if(col_set.find(col) == col_set.end()){
                             throw InternalError("having has cols that groupby cols not exist");
@@ -309,13 +312,17 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
             }
         }
 
-        //特殊处理IN子句
+        
         if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)){
             cond.is_lhs_col = true;
-            if(tables.size()>1)cond.lhs_col = {expr->tab_name, expr->col_name};
+            if(tables.size()>1){
+                if(expr->tab_name == ""){
+                    cond.lhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
+                }else cond.lhs_col = {expr->tab_name, expr->col_name};
+            }
             else cond.lhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
 
-           
+           //特殊处理IN子句
             if(e->op == ast::SvCompOp::SV_OP_IN){
                 std::vector<ColMeta> all_cols;
                 get_all_cols(tables, all_cols);
@@ -324,7 +331,8 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 ColMeta l_col_meta;
                 if(auto l_expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)){
                     if(tables.size()>1){
-                            l_tab_col = {l_expr->tab_name,l_expr->col_name};
+                            if(l_expr->tab_name == "")l_tab_col = {get_tb_name(tables,l_expr->col_name),l_expr->col_name};
+                            else l_tab_col = {l_expr->tab_name,l_expr->col_name};
                     }else{
                             l_tab_col = {get_tb_name(tables,l_expr->col_name),l_expr->col_name};
                     }
@@ -410,8 +418,12 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
             } else if (auto expr = std::dynamic_pointer_cast<ast::Col>(e->rhs)) {
                 //右边也是列值
                 cond.is_rhs_val = false;
-                if(tables.size()>1)cond.rhs_col = {expr->tab_name, expr->col_name};
-                else cond.rhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
+
+                if(tables.size()>1){
+                    if(expr->tab_name != ""){
+                        cond.rhs_col = {expr->tab_name, expr->col_name};
+                    }else cond.rhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
+                }else cond.rhs_col = {get_tb_name(tables,expr->col_name),expr->col_name};
 
                 if(tables.size()==2){
                     if(tables[0] == cond.rhs_col.tab_name){
@@ -445,7 +457,9 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 if(auto l_expr = std::dynamic_pointer_cast<ast::Col>(e->lhs)){
                     //检查左右类型是否匹配
                     if(query->tables.size()>1){
-                        l_tab_col = {l_expr->tab_name,l_expr->col_name};
+                        if(l_expr->tab_name != ""){
+                             l_tab_col = {l_expr->tab_name,l_expr->col_name};
+                        }else  l_tab_col = {get_tb_name(query->tables,l_expr->col_name),l_expr->col_name};
                     }else{
                         l_tab_col = {get_tb_name(query->tables,l_expr->col_name),l_expr->col_name};
                     }
