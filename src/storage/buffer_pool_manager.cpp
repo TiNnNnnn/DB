@@ -294,6 +294,21 @@ void BufferPoolManager::flush_all_pages(int fd) {
                 page->is_dirty_ = false; // 更新页面的脏状态
             }
         }
-       
     }
+}
+
+void BufferPoolManager::delete_all_page(int fd){
+    std::lock_guard<std::mutex>guard(latch_);
+
+    for(auto &entry :page_table_){
+        if(entry.first.fd == fd){
+            latch_.unlock();
+            auto ret =  delete_page({fd,entry.first.page_no});
+            if(ret == false){
+                std::cout<<"page ["<<entry.first.page_no<<"] pin_count != 0,delete failed"<<std::endl;
+            }
+            latch_.lock();
+        }
+    }
+
 }

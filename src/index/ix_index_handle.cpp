@@ -252,11 +252,11 @@ std::pair<IxNodeHandle *, bool> IxIndexHandle::find_leaf_page(const char *key, O
         // 当前节点不是叶子节点，需要继续向下查找
         // 首先获取当前节点的第一个键和对应的子节点
         page_id_t child_page_id = current_node->internal_lookup(key);
-        buffer_pool_manager_->unpin_page(current_node->get_page_id(),true);
         // 获取下一个节点
         IxNodeHandle *next_node = fetch_node(child_page_id);
          // 加锁下一个节点
         next_node->latch();
+        buffer_pool_manager_->unpin_page(current_node->get_page_id(),true);
         // unlatch当前节点
         current_node->unlatch();
         if(current_node == root_node)root_is_latched = false;
@@ -456,9 +456,6 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
     // 1. 查找key值应该插入到哪个叶子节点
     auto [leaf_node, root_is_latched] = find_leaf_page(key, Operation::INSERT, transaction);
 
-    // 加锁叶子节点
-    //leaf_node->latch();
-
     // 2. 在该叶子节点中插入键值对
     int insert_result = leaf_node->insert(key, value);
 
@@ -468,8 +465,9 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
             // 如果当前叶子节点是最右叶子节点，则更新file_hdr_.last_leaf_
             file_hdr_->last_leaf_ = leaf_node->get_page_no();
         }
-        leaf_node->unlatch();
         buffer_pool_manager_->unpin_page(leaf_node->get_page_id(), true);
+        leaf_node->unlatch();
+        
         return leaf_node->get_page_no();
     }
     // 3. 如果结点已满，分裂结点，并把新结点的相关信息插入父节点
@@ -812,6 +810,7 @@ Iid IxIndexHandle::lower_bound(const char *key) {
 
     // 释放页面
     buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);
+    leaf->unlatch();
     
     return iid;
 }
@@ -838,6 +837,7 @@ Iid IxIndexHandle::upper_bound(const char *key) {
 
     // 释放页面
     buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);
+    leaf->unlatch();
     
     return iid;
 }

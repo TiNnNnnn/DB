@@ -34,6 +34,7 @@ std::unique_ptr<RmRecord> RmFileHandle::get_record(const Rid& rid, Context* cont
     char *record_data = page_handle.get_slot(rid.slot_no);
     std::memcpy(record->data, record_data, record_size);
 
+    buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(),false);
     return record;
 }
 

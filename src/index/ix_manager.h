@@ -166,9 +166,7 @@ class IxManager {
         ih->file_hdr_->serialize(data);
         disk_manager_->write_page(ih->fd_, IX_FILE_HDR_PAGE, data, ih->file_hdr_->tot_len_);
         // 缓冲区的所有页刷到磁盘，注意这句话必须写在close_file前面
-        for(int i=0;i<ih->file_hdr_->num_pages_;i++){
-             buffer_pool_manager_->delete_page({ih->fd_,i});
-        }
+        buffer_pool_manager_->delete_all_page(ih->fd_);
         buffer_pool_manager_->flush_all_pages(ih->fd_);
         disk_manager_->close_file(ih->fd_);
     }

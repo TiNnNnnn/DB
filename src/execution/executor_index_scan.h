@@ -96,7 +96,6 @@ class IndexScanExecutor : public AbstractExecutor {
         }
         auto record = fh_->get_record(rid_,nullptr);
         return record;
-        return nullptr;
     }
 
     void build_ix_scan() {
@@ -169,7 +168,7 @@ class IndexScanExecutor : public AbstractExecutor {
             upper_bound_iid = ix_handle->upper_bound(upper_bound_key);
         }
 
-        scan_ = std::make_unique<IxScan>(ix_handle.get(), lower_bound_iid, upper_bound_iid);
+        scan_ = std::make_unique<IxScan>(ix_handle.get(), lower_bound_iid, upper_bound_iid,sm_manager_->get_bpm());
     }
 
     size_t tupleLen() const override {
