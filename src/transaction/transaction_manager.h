@@ -61,7 +61,6 @@ public:
 
         return res;
     }
-
     static std::unordered_map<txn_id_t, Transaction *> txn_map;     // 全局事务表，存放事务ID与事务对象的映射关系
 
 private:

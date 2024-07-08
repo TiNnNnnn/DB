@@ -39,6 +39,10 @@ void DiskManager::write_page(int fd, page_id_t page_no, const char *offset, int 
     if (bytes_written != num_bytes) {
         throw InternalError("DiskManager::write_page write Error");
     }
+    // 3. 调用 fsync() 函数刷新写入到磁盘
+    if (fsync(fd) == -1) {
+        throw InternalError("DiskManager::write_page fsync Error");
+    }
 }
 
 /**
@@ -156,6 +160,28 @@ void DiskManager::destroy_file(const std::string &path) {
             throw std::runtime_error("Failed to destroy file: " + path);
         }
         
+    }
+
+    // 刷新文件系统的元数据
+    // 获取文件的父目录路径
+    size_t last_slash_pos = path.find_last_of('/');
+    std::string dir_path = (last_slash_pos == std::string::npos) ? "." : path.substr(0, last_slash_pos);
+
+    // 打开父目录
+    int dir_fd = open(dir_path.c_str(), O_DIRECTORY | O_RDONLY);
+    if (dir_fd == -1) {
+        throw std::runtime_error("Failed to open directory: " + dir_path);
+    }
+
+    // 刷新父目录
+    if (fsync(dir_fd) == -1) {
+        close(dir_fd);
+        throw std::runtime_error("Failed to fsync directory: " + dir_path);
+    }
+
+    // 关闭目录文件描述符
+    if (close(dir_fd) == -1) {
+        throw std::runtime_error("Failed to close directory: " + dir_path);
     }
 }
 

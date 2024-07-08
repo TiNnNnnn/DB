@@ -137,6 +137,9 @@ class IxManager {
 
     void destroy_index(const std::string &filename, const std::vector<ColMeta>& index_cols) {
         std::string ix_name = get_index_name(filename, index_cols);
+        int fd = disk_manager_->get_file_fd(ix_name);
+        disk_manager_->set_fd2pageno(fd,-1);
+        disk_manager_->close_file(fd);
         disk_manager_->destroy_file(ix_name);
     }
 
@@ -163,6 +166,9 @@ class IxManager {
         ih->file_hdr_->serialize(data);
         disk_manager_->write_page(ih->fd_, IX_FILE_HDR_PAGE, data, ih->file_hdr_->tot_len_);
         // 缓冲区的所有页刷到磁盘，注意这句话必须写在close_file前面
+        for(int i=0;i<ih->file_hdr_->num_pages_;i++){
+             buffer_pool_manager_->delete_page({ih->fd_,i});
+        }
         buffer_pool_manager_->flush_all_pages(ih->fd_);
         disk_manager_->close_file(ih->fd_);
     }

@@ -252,6 +252,7 @@ std::pair<IxNodeHandle *, bool> IxIndexHandle::find_leaf_page(const char *key, O
         // 当前节点不是叶子节点，需要继续向下查找
         // 首先获取当前节点的第一个键和对应的子节点
         page_id_t child_page_id = current_node->internal_lookup(key);
+        buffer_pool_manager_->unpin_page(current_node->get_page_id(),true);
         // 获取下一个节点
         IxNodeHandle *next_node = fetch_node(child_page_id);
          // 加锁下一个节点

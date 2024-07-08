@@ -408,7 +408,9 @@ void SmManager::drop_index(const std::string& tab_name, const std::vector<std::s
 
     //删除索引
     std::string ix_name = ix_manager_->get_index_name(tab_name, col_names);
-    disk_manager_->close_file(disk_manager_->get_file_fd(ix_name));
+    //disk_manager_->close_file(disk_manager_->get_file_fd(ix_name));
+    auto ix_hdr = ihs_[ix_name].get();
+    ix_manager_->close_index(ix_hdr);
     ix_manager_->destroy_index(tab_name,col_names);
 
     //删除索引元数据

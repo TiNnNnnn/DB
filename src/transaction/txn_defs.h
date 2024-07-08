@@ -58,6 +58,8 @@ class WriteRecord {
 
     inline std::string &GetTableName() { return tab_name_; }
 
+    inline void SetRecord(RmRecord& record) {record_ = record;}
+
    private:
     WType wtype_;
     std::string tab_name_;
