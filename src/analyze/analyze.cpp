@@ -102,7 +102,6 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
         }
         check_clause(query->tables, query->conds);
 
-
         //处理分组条件
         if(x->group_by){
             auto group_cols = x->group_by->cols;
@@ -157,7 +156,6 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
             }else if(dir == ast::OrderBy_DESC){
                 op_dir = OrderBy_Dir::OP_DESC;
             }
-
             for (auto col : sel_cols) {
                 TabCol tab_col = {get_tb_name(query->tables,col->col_name),col->col_name};
                 check_column(all_cols, tab_col);  // 列元数据校验
@@ -165,10 +163,7 @@ std::shared_ptr<Query> Analyze::do_analyze(std::shared_ptr<ast::TreeNode> parse)
                 query->order_expr.cols.push_back(tab_col);
             }
             query->order_expr.dir = op_dir;
-            
         }
-
-
     } else if (auto x = std::dynamic_pointer_cast<ast::UpdateStmt>(parse)) {
         // 处理表名
         query->tables.push_back(x->tab_name);

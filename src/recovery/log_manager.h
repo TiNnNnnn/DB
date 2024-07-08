@@ -41,7 +41,7 @@ public:
     lsn_t lsn_;                /* 当前日志的lsn */
     uint32_t log_tot_len_;     /* 整个日志记录的长度 */
     txn_id_t log_tid_;         /* 创建当前日志的事务ID */
-    lsn_t prev_lsn_;           /* 事务创建的前一条日志记录的lsn，用于undo */
+    lsn_t prev_lsn_;           /* 事务创建的前一条日志记录的lsn，用于undo   <07-08: roll_pointer> */ 
 
     // 把日志记录序列化到dest中
     virtual void serialize (char* dest) const {
