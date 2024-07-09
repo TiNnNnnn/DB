@@ -187,6 +187,10 @@ class IxIndexHandle {
         return file_hdr_;
     }
 
+    int get_ix_file_fd(){return fd_;}
+
+    BufferPoolManager* get_buf_mgr(){return buffer_pool_manager_;}
+
     // for search
     bool get_value(const char *key, std::vector<Rid> *result, Transaction *transaction);
 

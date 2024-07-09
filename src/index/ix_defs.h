@@ -147,4 +147,15 @@ public:
     friend bool operator==(const Iid &x, const Iid &y) { return x.page_no == y.page_no && x.slot_no == y.slot_no; }
 
     friend bool operator!=(const Iid &x, const Iid &y) { return !(x == y); }
+
+    friend bool operator>=(const Iid &x, const Iid &y){
+        if(x.page_no > y.page_no){
+            return true;
+        }else if (x.page_no < y.page_no){
+            return false;
+        }else{
+            if(x.slot_no > y.slot_no)return true;
+            return false;
+        }
+    }
 };

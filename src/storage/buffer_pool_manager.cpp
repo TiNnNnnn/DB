@@ -148,7 +148,6 @@ bool BufferPoolManager::unpin_page(PageId page_id, bool is_dirty) {
     }
     // 2.2 若pin_count_大于0，则pin_count_自减一
     page->pin_count_--;
-
     // 2.2.1 若自减后等于0，则调用replacer_的Unpin
     if (page->pin_count_ == 0) {
         replacer_->unpin(frame_id);
@@ -158,9 +157,7 @@ bool BufferPoolManager::unpin_page(PageId page_id, bool is_dirty) {
     if (is_dirty) {
         page->is_dirty_ = true;
     }
-
     return true;
-
 }
 
 /**
@@ -267,7 +264,7 @@ bool BufferPoolManager::delete_page(PageId page_id) {
     page->id_.page_no = INVALID_PAGE_ID;
     page->is_dirty_ = false;
     page->pin_count_ = 0;
-    memset(page->data_, 0, PAGE_SIZE); // 清空页数据
+    page->reset_memory();
 
     // 6. 将其加入free_list_
     free_list_.push_back(frame_id);

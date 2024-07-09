@@ -66,6 +66,7 @@ class IndexScanExecutor : public AbstractExecutor {
 
     void beginTuple() override {
         build_ix_scan();
+
         while (!scan_->is_end()) {
             rid_ = scan_->rid();
             auto record = fh_->get_record(rid_,nullptr);
@@ -101,6 +102,7 @@ class IndexScanExecutor : public AbstractExecutor {
     void build_ix_scan() {
         std::string idx_name = sm_manager_->get_ix_manager()->get_index_name(tab_name_, index_col_names_);
         auto& ix_handle = sm_manager_->ihs_[idx_name];
+        auto ix_fd = ix_handle->get_ix_file_fd();
 
         char* lower_bound_key = new char[index_meta_.col_tot_len];
         char* upper_bound_key = new char[index_meta_.col_tot_len];
@@ -145,15 +147,6 @@ class IndexScanExecutor : public AbstractExecutor {
                     break;
                 }
             }
-            // if (!col_processed) {
-            //     // 对于未处理的索引列，补充空白字符
-            //     for(int i=0;i<col_meta->len;i++){
-            //         memcpy(lower_bound_key+offset,(const char*)'\0',sizeof('\0'));
-            //         memcpy(upper_bound_key+offset,(const char*)'\xFF',sizeof('xFF'));
-            //         offset+=1;
-            //     }
-            //     break;
-            // }
         }
         Iid lower_bound_iid;
         if (!has_lower_bound) {
@@ -164,8 +157,16 @@ class IndexScanExecutor : public AbstractExecutor {
         Iid upper_bound_iid;
         if (!has_upper_bound) {
             upper_bound_iid = {ix_handle->get_file_hdr()->last_leaf_, ix_handle->fetch_node(ix_handle->get_file_hdr()->last_leaf_)->get_size()};
+            ix_handle->get_buf_mgr()->unpin_page({ix_fd,ix_handle->get_file_hdr()->last_leaf_},false);
         } else {
             upper_bound_iid = ix_handle->upper_bound(upper_bound_key);
+            auto node = ix_handle->fetch_node(upper_bound_iid.page_no);
+            if (upper_bound_iid.page_no != ix_handle->get_file_hdr()->last_leaf_ && upper_bound_iid.slot_no == node->get_size()) {
+                // go to next leaf
+                upper_bound_iid.slot_no = 0;
+                upper_bound_iid.page_no = node->get_next_leaf();
+            }
+            ix_handle->get_buf_mgr()->unpin_page({ix_fd,node->get_page_no()},false);
         }
 
         scan_ = std::make_unique<IxScan>(ix_handle.get(), lower_bound_iid, upper_bound_iid,sm_manager_->get_bpm());

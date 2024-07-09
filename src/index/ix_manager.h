@@ -76,6 +76,8 @@ class IxManager {
         // 根据 |page_hdr| + (|attr| + |rid|) * (n + 1) <= PAGE_SIZE 求得n的最大值btree_order
         // 即 n <= btree_order，那么btree_order就是每个结点最多可插入的键值对数量（实际还多留了一个空位，但其不可插入）
         int btree_order = static_cast<int>((PAGE_SIZE - sizeof(IxPageHdr)) / (col_tot_len + sizeof(Rid)) - 1);
+        
+        //int btree_order = 3;
         assert(btree_order > 2);
 
         // Create file header and write to file
@@ -165,6 +167,9 @@ class IxManager {
         char* data = new char[ih->file_hdr_->tot_len_];
         ih->file_hdr_->serialize(data);
         disk_manager_->write_page(ih->fd_, IX_FILE_HDR_PAGE, data, ih->file_hdr_->tot_len_);
+        for(int i=0;i<ih->file_hdr_->num_pages_+1;i++){
+            buffer_pool_manager_->delete_page({ih->fd_,i});
+        }
         // 缓冲区的所有页刷到磁盘，注意这句话必须写在close_file前面
         buffer_pool_manager_->delete_all_page(ih->fd_);
         buffer_pool_manager_->flush_all_pages(ih->fd_);
