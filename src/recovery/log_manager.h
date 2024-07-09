@@ -377,7 +377,6 @@ public:
 };
 
 /* 日志缓冲区，只有一个buffer，因此需要阻塞地去把日志写入缓冲区中 */
-
 class LogBuffer {
 public:
     LogBuffer() { 

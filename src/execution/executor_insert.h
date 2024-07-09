@@ -51,7 +51,6 @@ class InsertExecutor : public AbstractExecutor {
                 }else{
                      throw IncompatibleTypeError(coltype2str(col.type), coltype2str(val.type));
                 }
-               
             }
             val.init_raw(col.len);
             memcpy(rec.data + col.offset, val.raw->data, col.len);
@@ -67,6 +66,14 @@ class InsertExecutor : public AbstractExecutor {
             }
             scan_->next();
         }
+
+        WriteRecord w_rec(WType::INSERT_TUPLE,tab_name_,rid_);
+        context_->txn_->get_write_set()->emplace_back(
+            std::make_unique<WriteRecord>(tab_name_, rid_, rec.data)
+        );
+
+        InsertLogRecord insert_log(context_->txn_->get_transaction_id(), rec ,rid_,tab_name_);
+        context_->log_mgr_->add_log_to_buffer(&insert_log);
 
         // Insert into record file
         rid_ = fh_->insert_record(rec.data, context_);

@@ -31,7 +31,6 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     if (txn == nullptr) {
         txn_id_t txn_id = next_txn_id_++;
         txn = new Transaction(txn_id);
-        
     }
     {
         //把开始事务加入到全局事务表中
@@ -60,25 +59,7 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     RmManager* rm_mgr =  sm_manager_->get_rm_manager();
     //提交所有未提交的写操作
     if (txn->get_write_set()->size() > 0) {
-        auto write_set = txn->get_write_set();
-        while(!write_set->empty()){
-            auto w_set = write_set->front();
-            auto rm_file_hdr = rm_mgr->open_file(w_set->GetTableName());
-            if(w_set->GetWriteType() == WType::INSERT_TUPLE){
-                rm_file_hdr->insert_record(w_set->GetRid(),w_set->GetRecord().data);
-            }else if(w_set->GetWriteType() == WType::DELETE_TUPLE){
-                rm_file_hdr->delete_record(w_set->GetRid(),nullptr);
-            }else if(w_set->GetWriteType() == WType::UPDATE_TUPLE){
-                auto old_value = rm_file_hdr->get_record(w_set->GetRid(),nullptr);
-                if(!old_value){
-                    throw InternalError("no value in page: "+std::to_string(w_set->GetRid().page_no)+",slot_no:"+std::to_string(w_set->GetRid().slot_no));
-                }
-                rm_file_hdr->update_record(w_set->GetRid(),w_set->GetRecord().data,nullptr);
-                w_set->SetRecord(*old_value);
-            }else{
-                throw InternalError("bad wtype");
-            }
-        }
+        
     }
     //释放所有锁
     auto lock_set = txn->get_lock_set();
