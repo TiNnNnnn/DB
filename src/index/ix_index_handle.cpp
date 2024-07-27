@@ -90,8 +90,8 @@ page_id_t IxNodeHandle::internal_lookup(const char *key) {
 
     // 1. 查找当前非叶子节点中目标key所在孩子节点（子树）的位置
     int idx = lower_bound(key);
-    if( 0 == memcmp(key,&keys[idx],sizeof(key))){
-        idx++;
+    if( 0 == memcmp(key,keys + idx* file_hdr->col_tot_len_,file_hdr->col_tot_len_)){
+        idx++;    
     }
     return value_at(idx);
 }
