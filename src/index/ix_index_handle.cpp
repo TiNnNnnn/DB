@@ -399,8 +399,9 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
         file_hdr_->num_pages_++;
         new_root_node->latch();
         // 初始化新根节点
-        new_root_node->set_size(1);
+        new_root_node->set_size(2);
         new_root_node->set_key(0, key);
+        new_root_node->set_key(1, "");//空值，无实际数据
         new_root_node->set_rid(0, {old_node->get_page_no(), 0});
         new_root_node->set_rid(1, {new_node->get_page_no(), 0});
 
@@ -427,12 +428,15 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
     // 3. 获取key对应的rid，并将(key, rid)插入到父亲结点
     int insert_pos = parent_node->find_child(old_node);
     parent_node->insert_pair(insert_pos + 1, key, {new_node->get_page_no(), 0});
+    
 
     // 4. 如果父亲结点仍需要继续分裂，则进行递归插入
     if (parent_node->get_size() >= parent_node->get_max_size()) {
         IxNodeHandle *new_sibling_node = split(parent_node);
+        new_sibling_node->latch();
         const char *new_key = parent_node->get_key(parent_node->get_size() - 1);
         insert_into_parent(parent_node, new_key, new_sibling_node, transaction);
+        new_sibling_node->unlatch();
         buffer_pool_manager_->unpin_page(new_sibling_node->get_page_id(), true);
     }
     // 释放父节点
