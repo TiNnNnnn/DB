@@ -117,6 +117,8 @@ class IxNodeHandle {
 
     void insert_pairs(int pos, const char *key, const Rid *rid, int n);
 
+    void insert_pairs(int key_pos,int rid_pos,const char *key,const Rid *rid, int n);
+
     page_id_t internal_lookup(const char *key);
 
     bool leaf_lookup(const char *key, Rid **value);
@@ -150,12 +152,12 @@ class IxNodeHandle {
      */
     int find_child(IxNodeHandle *child) {
         int rid_idx;
-        for (rid_idx = 0; rid_idx < page_hdr->num_key; rid_idx++) {
+        for (rid_idx = 0; rid_idx < page_hdr->num_key+1; rid_idx++) {
             if (get_rid(rid_idx)->page_no == child->get_page_no()) {
                 break;
             }
         }
-        assert(rid_idx < page_hdr->num_key);
+        assert(rid_idx < page_hdr->num_key+1);
         return rid_idx;
     }
 

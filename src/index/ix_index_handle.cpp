@@ -138,6 +138,31 @@ void IxNodeHandle::insert_pairs(int pos, const char *key, const Rid *rid, int n)
     set_size(get_size() + n);
 }
 
+
+void IxNodeHandle::insert_pairs(int key_pos,int rid_pos,const char *key,const Rid *rid,int n){
+    // 1. 判断pos的合法性
+    assert(key_pos >= 0 && key_pos <= get_size());
+    assert(rid_pos >= 0 && rid_pos <= get_size()+1);
+    // 2. 移动原有的键值对来腾出插入位置
+    // 移动keys数组中的数据
+    int key_move_count = get_size() - key_pos;
+    if (key_move_count > 0) {
+        memmove(keys + (key_pos + n) * file_hdr->col_tot_len_, keys + key_pos * file_hdr->col_tot_len_, key_move_count * file_hdr->col_tot_len_);
+    }
+    // 3. 移动rids数组中的数据
+    int rid_move_count = get_size() + 1 - rid_pos;
+    if (rid_move_count > 0) {
+        memmove(rids + (rid_pos + n), rids + rid_pos, rid_move_count * sizeof(Rid));
+    }
+    // 4. 将新的键值对插入到腾出的插入位置
+    for (int i = 0; i < n; ++i) {
+        set_key(key_pos + i, key + i * file_hdr->col_tot_len_);
+        set_rid(rid_pos + i, rid[i]);
+    }
+    // 5. 更新当前节点的键数量
+    set_size(get_size() + n);
+}
+
 /**
  * @brief 用于在结点中插入单个键值对。
  * 函数返回插入后的键值对数量
@@ -390,7 +415,7 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
     // 4. 如果父亲结点仍需要继续分裂，则进行递归插入
     // 提示：记得unpin page
 
-     // 1. 分裂前的结点（原结点, old_node）是否为根结点，如果为根结点需要分配新的root
+    // 1. 分裂前的结点（原结点, old_node）是否为根结点，如果为根结点需要分配新的root
     if (old_node->is_root_page()) {
         // 创建新的根节点
         PageId pid(fd_,INVALID_PAGE_ID);
@@ -399,9 +424,9 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
         file_hdr_->num_pages_++;
         new_root_node->latch();
         // 初始化新根节点
-        new_root_node->set_size(2);
+        new_root_node->set_size(1);
         new_root_node->set_key(0, key);
-        new_root_node->set_key(1, "");//空值，无实际数据
+        //new_root_node->set_key(1, "");//空值，无实际数据
         new_root_node->set_rid(0, {old_node->get_page_no(), 0});
         new_root_node->set_rid(1, {new_node->get_page_no(), 0});
 
@@ -425,11 +450,20 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
     IxNodeHandle *parent_node = fetch_node(old_node->get_parent_page_no());
     parent_node->latch();
 
+    // 更新新节点的父节点指针
+    new_node->set_parent_page_no(parent_node->get_page_no());
+
     // 3. 获取key对应的rid，并将(key, rid)插入到父亲结点
     int insert_pos = parent_node->find_child(old_node);
-    parent_node->insert_pair(insert_pos + 1, key, {new_node->get_page_no(), 0});
+    if(insert_pos == parent_node->page_hdr->num_key){
+        Rid tmp_rid{new_node->get_page_no(), 0};
+        parent_node->insert_pairs(insert_pos,insert_pos+1,key,&tmp_rid,1);
+    }else{
+        Rid tmp_rid{new_node->get_page_no(), 0};
+        parent_node->insert_pairs(insert_pos+1,insert_pos+1,key,&tmp_rid,1);
+        //parent_node->insert_pair(insert_pos + 1, key, {new_node->get_page_no(), 0});
+    }
     
-
     // 4. 如果父亲结点仍需要继续分裂，则进行递归插入
     if (parent_node->get_size() >= parent_node->get_max_size()) {
         IxNodeHandle *new_sibling_node = split(parent_node);
