@@ -165,15 +165,17 @@ class IndexScanExecutor : public AbstractExecutor {
             ix_handle->get_buf_mgr()->unpin_page({ix_fd,ix_handle->get_file_hdr()->last_leaf_},false);
         } else {
             upper_bound_iid = ix_handle->upper_bound(upper_bound_key);
-            if(equal_cnt != fed_conds_.size()){
-                  auto node = ix_handle->fetch_node(upper_bound_iid.page_no);
-                if (upper_bound_iid.page_no != ix_handle->get_file_hdr()->last_leaf_ && upper_bound_iid.slot_no == node->get_size()) {
+            
+            auto node = ix_handle->fetch_node(upper_bound_iid.page_no);
+            if (upper_bound_iid.page_no != ix_handle->get_file_hdr()->last_leaf_ && upper_bound_iid.slot_no == node->get_size()) {
                     // go to next leaf
+                if(equal_cnt != fed_conds_.size()){
                     upper_bound_iid.slot_no = 0;
                     upper_bound_iid.page_no = node->get_next_leaf();
                 }
-                ix_handle->get_buf_mgr()->unpin_page({ix_fd,node->get_page_no()},false);
+                
             }
+            ix_handle->get_buf_mgr()->unpin_page({ix_fd,node->get_page_no()},false);
           
         }
 
