@@ -114,9 +114,12 @@ class IndexScanExecutor : public AbstractExecutor {
         bool has_upper_bound = false;
 
         int offset = 0;
+        int equal_cnt = 0;
         for (const auto& idx_col : index_col_names_) {
             bool col_processed = false;
             auto col_meta = sm_manager_->db_.get_table(tab_name_).get_col(idx_col);
+
+            
 
             for (auto& cond : fed_conds_) {
                 if (!cond.is_rhs_val) {
@@ -135,6 +138,7 @@ class IndexScanExecutor : public AbstractExecutor {
                         offset += col_meta->len;
                         has_lower_bound = true;
                         has_upper_bound = true;
+                        equal_cnt++;
                     } else if (cond.op == OP_LT || cond.op == OP_LE) {
                         memcpy(upper_bound_key+offset,cond.rhs_val.raw->data,col_meta->len);
                         offset += col_meta->len;
@@ -148,6 +152,7 @@ class IndexScanExecutor : public AbstractExecutor {
                 }
             }
         }
+
         Iid lower_bound_iid;
         if (!has_lower_bound) {
             lower_bound_iid = {ix_handle->get_file_hdr()->first_leaf_, 0};
@@ -160,16 +165,22 @@ class IndexScanExecutor : public AbstractExecutor {
             ix_handle->get_buf_mgr()->unpin_page({ix_fd,ix_handle->get_file_hdr()->last_leaf_},false);
         } else {
             upper_bound_iid = ix_handle->upper_bound(upper_bound_key);
-            auto node = ix_handle->fetch_node(upper_bound_iid.page_no);
-            if (upper_bound_iid.page_no != ix_handle->get_file_hdr()->last_leaf_ && upper_bound_iid.slot_no == node->get_size()) {
-                // go to next leaf
-                upper_bound_iid.slot_no = 0;
-                upper_bound_iid.page_no = node->get_next_leaf();
+            if(equal_cnt != fed_conds_.size()){
+                  auto node = ix_handle->fetch_node(upper_bound_iid.page_no);
+                if (upper_bound_iid.page_no != ix_handle->get_file_hdr()->last_leaf_ && upper_bound_iid.slot_no == node->get_size()) {
+                    // go to next leaf
+                    upper_bound_iid.slot_no = 0;
+                    upper_bound_iid.page_no = node->get_next_leaf();
+                }
+                ix_handle->get_buf_mgr()->unpin_page({ix_fd,node->get_page_no()},false);
             }
-            ix_handle->get_buf_mgr()->unpin_page({ix_fd,node->get_page_no()},false);
+          
         }
 
+        
+
         scan_ = std::make_unique<IxScan>(ix_handle.get(), lower_bound_iid, upper_bound_iid,sm_manager_->get_bpm());
+    
     }
 
     size_t tupleLen() const override {
