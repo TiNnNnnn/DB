@@ -457,7 +457,6 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
 
         if(!old_node->is_leaf_page()){
             //删除new_node的第一个key
-            //new_node->erase_pair(0);
             new_node->erase_keys(0);
         }
         // 更新文件头的根节点指针
@@ -483,6 +482,11 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
         Rid tmp_rid{new_node->get_page_no(), 0};
         parent_node->insert_pairs(insert_pos+1,insert_pos+1,key,&tmp_rid,1);
         //parent_node->insert_pair(insert_pos + 1, key, {new_node->get_page_no(), 0});
+    }
+
+    if(!old_node->is_leaf_page()){
+        //删除new_node的第一个key
+        new_node->erase_keys(0);
     }
     
     // 4. 如果父亲结点仍需要继续分裂，则进行递归插入
