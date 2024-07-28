@@ -217,6 +217,21 @@ void IxNodeHandle::erase_pair(int pos) {
     set_size(get_size() - 1);
 }
 
+void IxNodeHandle::erase_keys(int pos){
+    int size = file_hdr->btree_order_+1; //btree_order+1
+    
+    // 1. 删除该位置的key，将从pos+1开始的所有key向前移动一位，覆盖pos位置的key
+    memmove(keys + pos * file_hdr->col_tot_len_,
+            keys + (pos + 1) * file_hdr->col_tot_len_,
+            (size - pos - 1) * file_hdr->col_tot_len_);
+
+    if(pos < size-1)
+        memset(keys+(pos+1)*file_hdr->col_tot_len_,0,file_hdr->col_tot_len_);
+    else if(pos == size-1)
+        memset(keys+pos*file_hdr->col_tot_len_,0,file_hdr->col_tot_len_);
+    set_size(get_size() - 1);
+}
+
 /**
  * @brief 用于在结点中删除指定key的键值对。函数返回删除后的键值对数量
  *
@@ -371,12 +386,14 @@ IxNodeHandle *IxIndexHandle::split(IxNodeHandle *node) {
         }
     } else { // 如果要拆分的节点是非叶子节点
         new_node->page_hdr->is_leaf = false;
-        // 将原节点的右半部分复制到新节点中，并更新原节点的键值对数量
-        for (int i = mid_idx + 1; i < node->get_size(); ++i) {
-            new_node->insert_pair(i - mid_idx - 1, node->get_key(i), *node->get_rid(i));
+        // 将原节点的右半部分复制到新节点中
+        for (int i = mid_idx; i < node->get_size(); ++i) {
+            new_node->insert_pair(i - mid_idx, node->get_key(i), *node->get_rid(i+1));
+            //new_node->insert_pairs(i-mid_idx,i-mid_idx,node->get_key(i),node->get_rid(i+1),1);
         }
+        
         // 更新原节点的右半部分的父节点信息为新节点
-        for (int i = mid_idx; i < node->get_size() + 1; ++i) {
+        for (int i = mid_idx + 1; i < node->get_size() + 1; ++i) {
             IxNodeHandle *child = fetch_node(node->value_at(i));
             child->latch();
             child->set_parent_page_no(new_node->get_page_no());
@@ -426,7 +443,6 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
         // 初始化新根节点
         new_root_node->set_size(1);
         new_root_node->set_key(0, key);
-        //new_root_node->set_key(1, "");//空值，无实际数据
         new_root_node->set_rid(0, {old_node->get_page_no(), 0});
         new_root_node->set_rid(1, {new_node->get_page_no(), 0});
 
@@ -438,6 +454,12 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
         // 更新旧根节点和新节点的父节点指针
         old_node->set_parent_page_no(new_root_node->get_page_no());
         new_node->set_parent_page_no(new_root_node->get_page_no());
+
+        if(!old_node->is_leaf_page()){
+            //删除new_node的第一个key
+            //new_node->erase_pair(0);
+            new_node->erase_keys(0);
+        }
         // 更新文件头的根节点指针
         file_hdr_->root_page_ = new_root_node->get_page_no();
         // 新根节点创建完成，返回
@@ -445,7 +467,6 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
         buffer_pool_manager_->unpin_page(new_root_node->get_page_id(), true);
         return;
     }
-
     // 2. 获取原结点（old_node）的父亲结点
     IxNodeHandle *parent_node = fetch_node(old_node->get_parent_page_no());
     parent_node->latch();
@@ -468,8 +489,8 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
     if (parent_node->get_size() >= parent_node->get_max_size()) {
         IxNodeHandle *new_sibling_node = split(parent_node);
         new_sibling_node->latch();
-        const char *new_key = parent_node->get_key(parent_node->get_size() - 1);
-        insert_into_parent(parent_node, new_key, new_sibling_node, transaction);
+        //const char *new_key = parent_node->get_key(parent_node->get_size() - 1);
+        insert_into_parent(parent_node, new_sibling_node->get_key(0), new_sibling_node, transaction);
         new_sibling_node->unlatch();
         buffer_pool_manager_->unpin_page(new_sibling_node->get_page_id(), true);
     }

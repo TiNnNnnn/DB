@@ -130,6 +130,8 @@ class IxNodeHandle {
 
     void erase_pair(int pos);
 
+    void erase_keys(int pos);
+
     int remove(const char *key);
 
     /**
