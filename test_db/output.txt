@@ -1,5 +1,0 @@
-| w_id | name | flo |
-failure
-| w_id | name | flo |
-| 2999 | 13345678 | 256.500000 |
-| w_id | name | flo |
