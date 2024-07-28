@@ -119,8 +119,6 @@ class IndexScanExecutor : public AbstractExecutor {
             bool col_processed = false;
             auto col_meta = sm_manager_->db_.get_table(tab_name_).get_col(idx_col);
 
-            
-
             for (auto& cond : fed_conds_) {
                 if (!cond.is_rhs_val) {
                     continue;
@@ -168,8 +166,8 @@ class IndexScanExecutor : public AbstractExecutor {
             
             auto node = ix_handle->fetch_node(upper_bound_iid.page_no);
             if (upper_bound_iid.page_no != ix_handle->get_file_hdr()->last_leaf_ && upper_bound_iid.slot_no == node->get_size()) {
-                    // go to next leaf
-                if(equal_cnt != fed_conds_.size()){
+                // go to next leaf
+                if(equal_cnt != fed_conds_.size() && equal_cnt > 1){
                     upper_bound_iid.slot_no = 0;
                     upper_bound_iid.page_no = node->get_next_leaf();
                 }
@@ -178,9 +176,6 @@ class IndexScanExecutor : public AbstractExecutor {
             ix_handle->get_buf_mgr()->unpin_page({ix_fd,node->get_page_no()},false);
           
         }
-
-        
-
         scan_ = std::make_unique<IxScan>(ix_handle.get(), lower_bound_iid, upper_bound_iid,sm_manager_->get_bpm());
     
     }
