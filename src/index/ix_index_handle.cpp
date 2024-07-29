@@ -480,7 +480,12 @@ void IxIndexHandle::insert_into_parent(IxNodeHandle *old_node, const char *key, 
         parent_node->insert_pairs(insert_pos,insert_pos+1,key,&tmp_rid,1);
     }else{
         Rid tmp_rid{new_node->get_page_no(), 0};
-        parent_node->insert_pairs(insert_pos+1,insert_pos+1,key,&tmp_rid,1);
+        if(memcmp(parent_node->get_key(insert_pos),key,file_hdr_->col_tot_len_)>0){
+            parent_node->insert_pairs(insert_pos,insert_pos+1,key,&tmp_rid,1);
+        }else{
+            parent_node->insert_pairs(insert_pos+1,insert_pos+1,key,&tmp_rid,1);
+        }
+        
         //parent_node->insert_pair(insert_pos + 1, key, {new_node->get_page_no(), 0});
     }
 
