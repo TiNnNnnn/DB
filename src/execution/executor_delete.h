@@ -41,8 +41,17 @@ class DeleteExecutor : public AbstractExecutor {
             // 获取要删除的记录
             std::unique_ptr<RmRecord> rec = fh_->get_record(rid, context_);
             if(!rec) return nullptr;
+
+            //加入write_set
+            WriteRecord *wr = new WriteRecord(WType::DELETE_TUPLE,tab_.name,rid,*rec);
+            context_->txn_->append_write_record(wr);
+            //加入log_buffer
+            DeleteLogRecord *del_log_record = new  DeleteLogRecord(context_->txn_->get_transaction_id(),*rec,rid,tab_.name);
+            context_->log_mgr_->add_log_to_buffer(del_log_record);
+
             // 删除记录
             fh_->delete_record(rid, context_);
+            
             // 更新索引
             for (size_t i = 0; i < tab_.indexes.size(); ++i) {
                 auto &index = tab_.indexes[i];  // 获取索引元数据

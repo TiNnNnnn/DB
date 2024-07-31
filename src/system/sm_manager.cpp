@@ -60,6 +60,8 @@ void SmManager::create_db(const std::string& db_name) {
 
     // 创建日志文件
     disk_manager_->create_file(LOG_FILE_NAME);
+    int log_fd = disk_manager_->open_file(LOG_FILE_NAME);
+    disk_manager_->SetLogFd(log_fd);
 
     // 回到根目录
     if (chdir("..") < 0) {

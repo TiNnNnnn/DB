@@ -77,7 +77,7 @@ class IxManager {
         // 即 n <= btree_order，那么btree_order就是每个结点最多可插入的键值对数量（实际还多留了一个空位，但其不可插入）
         int btree_order = static_cast<int>((PAGE_SIZE - sizeof(IxPageHdr)) / (col_tot_len + sizeof(Rid)) - 1);
         
-        //btree_order = 3;
+        btree_order = 3;
         assert(btree_order > 2);
 
         // Create file header and write to file
@@ -99,7 +99,6 @@ class IxManager {
         char page_buf[PAGE_SIZE];  // 在内存中初始化page_buf中的内容，然后将其写入磁盘
         memset(page_buf, 0, PAGE_SIZE);
         // 注意leaf header页号为1，也标记为叶子结点，其前一个/后一个叶子均指向root node
-
 
         // Create leaf list header page and write to file （管理叶子节点链表）
         {

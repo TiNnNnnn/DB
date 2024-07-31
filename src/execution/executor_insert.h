@@ -70,7 +70,15 @@ class InsertExecutor : public AbstractExecutor {
 
         // Insert into record file
         rid_ = fh_->insert_record(rec.data, context_);
+
+        //加入write_set
+        WriteRecord* wr = new WriteRecord(WType::INSERT_TUPLE,tab_.name,rid_);
+        context_->txn_->append_write_record(wr);
         
+        //加入log_buffer
+        InsertLogRecord *insert_log_record = new InsertLogRecord(context_->txn_->get_transaction_id(),rec,rid_,tab_.name);
+        context_->log_mgr_->add_log_to_buffer(insert_log_record);
+
         // Insert into index
         for(size_t i = 0; i < tab_.indexes.size(); ++i) {
             auto& index = tab_.indexes[i];

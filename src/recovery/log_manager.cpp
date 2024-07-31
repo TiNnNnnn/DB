@@ -43,7 +43,6 @@ lsn_t LogManager::add_log_to_buffer(LogRecord* log_record) {
 void LogManager::flush_log_to_disk() {
     std::unique_lock<std::mutex> lock(latch_);
     if (log_buffer_.offset_ > 0) {
-        // 将缓冲区内容写入磁盘
         disk_manager_->write_log(log_buffer_.buffer_, log_buffer_.offset_);
         // 更新已持久化的LSN
         persist_lsn_ = global_lsn_ - 1;

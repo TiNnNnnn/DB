@@ -41,6 +41,7 @@ class UpdateExecutor : public AbstractExecutor {
         for (auto &rid : rids_) {
             // 获取要更新的记录
             std::unique_ptr<RmRecord> rec = fh_->get_record(rid, context_);
+            auto old_rec = *(rec.get());
 
             // 记录原始数据用于索引更新
             std::vector<char*> old_keys;
@@ -90,6 +91,14 @@ class UpdateExecutor : public AbstractExecutor {
                 ih->insert_entry(new_key, rid, context_->txn_);
                 delete[] new_key;
             }
+
+            
+            //加入write_set
+            WriteRecord *wr = new WriteRecord (WType::UPDATE_TUPLE,tab_.name,rid,old_rec);
+            context_->txn_->append_write_record(wr);
+            //加入log_buffer
+            UpdateLogRecord *update_log_record = new UpdateLogRecord(context_->txn_->get_transaction_id(),old_rec,*rec,rid,tab_.name);
+            context_->log_mgr_->add_log_to_buffer(update_log_record);
 
             // 更新记录到文件
             fh_->update_record(rid, rec->data, context_);

@@ -1,12 +1,9 @@
 test
 1
-warehouse
+student
 3
-warehouse w_id 0 4 0 1
-warehouse name 2 8 4 0
-warehouse flo 1 4 12 1
-1
-warehouse 8 2
-warehouse w_id 0 4 0 1
-warehouse flo 1 4 12 1
+student id 0 4 0 0
+student name 2 8 4 0
+student score 1 4 12 0
+0
 

@@ -198,7 +198,8 @@ int DiskManager::open_file(const std::string &path) {
 
    // 检查文件是否已经在打开文件列表中
     if (path2fd_.find(path) != path2fd_.end()) {
-        throw std::runtime_error("File is already open: " + path);
+        //std::runtime_error("File is already open: " + path);
+        return path2fd_[path];
     }
 
     // 调用 open() 函数以读写模式打开文件
