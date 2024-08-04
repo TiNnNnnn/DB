@@ -94,7 +94,7 @@ class UpdateExecutor : public AbstractExecutor {
 
             
             //加入write_set
-            WriteRecord *wr = new WriteRecord (WType::UPDATE_TUPLE,tab_.name,rid,old_rec);
+            WriteRecord *wr = new WriteRecord (WType::UPDATE_TUPLE,tab_.name,rid,old_rec,*rec);
             context_->txn_->append_write_record(wr);
             //加入log_buffer
             UpdateLogRecord *update_log_record = new UpdateLogRecord(context_->txn_->get_transaction_id(),old_rec,*rec,rid,tab_.name);

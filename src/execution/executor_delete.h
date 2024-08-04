@@ -43,7 +43,7 @@ class DeleteExecutor : public AbstractExecutor {
             if(!rec) return nullptr;
 
             //加入write_set
-            WriteRecord *wr = new WriteRecord(WType::DELETE_TUPLE,tab_.name,rid,*rec);
+            WriteRecord *wr = new WriteRecord(WType::DELETE_TUPLE,tab_.name,rid,*rec,*rec);
             context_->txn_->append_write_record(wr);
             //加入log_buffer
             DeleteLogRecord *del_log_record = new  DeleteLogRecord(context_->txn_->get_transaction_id(),*rec,rid,tab_.name);

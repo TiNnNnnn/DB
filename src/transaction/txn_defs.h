@@ -41,16 +41,18 @@ class WriteRecord {
     WriteRecord() = default;
 
     // constructor for insert operation
-    WriteRecord(WType wtype, const std::string &tab_name, const Rid &rid)
-        : wtype_(wtype), tab_name_(tab_name), rid_(rid) {}
+    WriteRecord(WType wtype, const std::string &tab_name, const Rid &rid,const RmRecord &record)
+        : wtype_(wtype), tab_name_(tab_name), rid_(rid),record_(record) {}
 
     // constructor for delete & update operation
-    WriteRecord(WType wtype, const std::string &tab_name, const Rid &rid, const RmRecord &record)
-        : wtype_(wtype), tab_name_(tab_name), rid_(rid), record_(record) {}
+    WriteRecord(WType wtype, const std::string &tab_name, const Rid &rid, const RmRecord &record,const RmRecord &new_record)
+        : wtype_(wtype), tab_name_(tab_name), rid_(rid), record_(record), new_record_(new_record){}
 
     ~WriteRecord() = default;
 
     inline RmRecord &GetRecord() { return record_; }
+
+    inline RmRecord &GetNewRecord() {return new_record_;}
 
     inline Rid &GetRid() { return rid_; }
 
@@ -60,11 +62,14 @@ class WriteRecord {
 
     inline void SetRecord(RmRecord& record) {record_ = record;}
 
+    inline void SetNewRecord(RmRecord& record){new_record_ = record;}
+
    private:
     WType wtype_;
     std::string tab_name_;
     Rid rid_;
     RmRecord record_;
+    RmRecord new_record_;
 };
 
 /* 多粒度锁，加锁对象的类型，包括记录和表 */

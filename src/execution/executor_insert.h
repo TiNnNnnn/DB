@@ -72,7 +72,7 @@ class InsertExecutor : public AbstractExecutor {
         rid_ = fh_->insert_record(rec.data, context_);
 
         //加入write_set
-        WriteRecord* wr = new WriteRecord(WType::INSERT_TUPLE,tab_.name,rid_);
+        WriteRecord* wr = new WriteRecord(WType::INSERT_TUPLE,tab_.name,rid_,rec);
         context_->txn_->append_write_record(wr);
         
         //加入log_buffer
