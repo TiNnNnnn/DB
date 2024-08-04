@@ -102,6 +102,8 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
     RmManager* rm_mgr = sm_manager_->get_rm_manager();
+    
+    auto db_name = sm_manager_->db_.get_db_name();
     auto write_set = txn->get_write_set();
 
     if (chdir(sm_manager_->db_.get_db_name().c_str()) < 0) {  // 进入数据库目录
@@ -114,12 +116,47 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
         if (w_set->GetWriteType() == WType::INSERT_TUPLE) {
             // 删除插入的记录
             rm_file_hdr->delete_record(w_set->GetRid(), nullptr);
+            for(auto index : sm_manager_->db_.get_table(db_name).indexes){
+                auto idx_hdr = sm_manager_->get_ix_manager()->open_index(db_name,index.cols);
+                char *key = new char[index.col_tot_len];  // 为索引键分配内存
+                int offset = 0;
+                // 构建索引键值
+                for (size_t j = 0; j < index.col_num; ++j) {
+                    memcpy(key + offset, w_set->GetRecord().data + index.cols[j].offset, index.cols[j].len);
+                    offset += index.cols[j].len;
+                }
+                idx_hdr->delete_entry(key,txn);
+            }
+            
         } else if (w_set->GetWriteType() == WType::DELETE_TUPLE) {
             // 恢复删除的记录
             rm_file_hdr->insert_record(w_set->GetRid(), w_set->GetRecord().data);
+            for(auto index : sm_manager_->db_.get_table(db_name).indexes){
+                auto idx_hdr = sm_manager_->get_ix_manager()->open_index(db_name,index.cols);
+                char *key = new char[index.col_tot_len];  // 为索引键分配内存
+                int offset = 0;
+                // 构建索引键值
+                for (size_t j = 0; j < index.col_num; ++j) {
+                    memcpy(key + offset, w_set->GetRecord().data + index.cols[j].offset, index.cols[j].len);
+                    offset += index.cols[j].len;
+                }
+                idx_hdr->insert_entry(key,w_set->GetRid(),txn);
+            }
         } else if (w_set->GetWriteType() == WType::UPDATE_TUPLE) {
             // 恢复更新前的记录
             rm_file_hdr->update_record(w_set->GetRid(), w_set->GetRecord().data, nullptr);
+            for(auto index : sm_manager_->db_.get_table(db_name).indexes){
+                auto idx_hdr = sm_manager_->get_ix_manager()->open_index(db_name,index.cols);
+                char *key = new char[index.col_tot_len];  // 为索引键分配内存
+                int offset = 0;
+                // 构建索引键值
+                for (size_t j = 0; j < index.col_num; ++j) {
+                    memcpy(key + offset, w_set->GetRecord().data + index.cols[j].offset, index.cols[j].len);
+                    offset += index.cols[j].len;
+                }
+                idx_hdr->delete_entry(key,txn);
+                idx_hdr->insert_entry(key,w_set->GetRid(),txn);
+            }
         } else {
             throw InternalError("bad wtype");
         }

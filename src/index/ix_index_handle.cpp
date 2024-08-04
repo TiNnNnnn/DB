@@ -306,6 +306,7 @@ std::pair<IxNodeHandle *, bool> IxIndexHandle::find_leaf_page(const char *key, O
         current_node->unlatch();
         current_node = next_node;
     }
+    //transaction->append_index_latch_page_set();
     // 3. 返回叶子节点和根节点是否加锁的信息
     return std::make_pair(current_node, false);
 }
@@ -591,9 +592,9 @@ bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
     buffer_pool_manager_->unpin_page(leaf_node->get_page_id(), true);
 
     // 4. 如果需要并发，并且需要删除叶子结点，则需要在事务的delete_page_set中添加删除结点的对应页面
-    if (result && transaction != nullptr) {
-        transaction->append_index_deleted_page(leaf_node->page);
-    }
+    // if (result && transaction != nullptr) {
+    //     transaction->append_index_deleted_page(leaf_node->page);
+    // }
 
     return true;
 }
@@ -810,10 +811,14 @@ bool IxIndexHandle::coalesce(IxNodeHandle **neighbor_node, IxNodeHandle **node, 
         file_hdr_->last_leaf_ = left_node->get_page_id().page_no;
     }
 
+    //将待删除页面记录到txn中
+    //transaction->append_index_deleted_page(right_node->page);
+
     // 3. 释放和删除right_node结点，并删除parent中right_node结点的信息，返回parent是否需要被删除
     buffer_pool_manager_->unpin_page(right_node->get_page_id(), true);
     buffer_pool_manager_->delete_page(right_node->get_page_id());
 
+    //todo
     // 删除parent中right_node对应的信息
     (*parent)->erase_pair(index);
 
