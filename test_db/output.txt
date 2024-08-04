@@ -1,3 +1,0 @@
-| id | name | score |
-| 1 | xiaohong | 90.000000 |
-| 3 | zhanghua | 88.500000 |
