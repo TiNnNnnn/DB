@@ -31,6 +31,7 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     if (txn == nullptr) {
         txn_id_t txn_id = next_txn_id_++;
         txn = new Transaction(txn_id);
+        txn->set_start_ts(txn_id);
     }
     {
         //把事务加入到全局事务表中

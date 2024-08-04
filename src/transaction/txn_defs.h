@@ -68,49 +68,51 @@ class WriteRecord {
 };
 
 /* 多粒度锁，加锁对象的类型，包括记录和表 */
-enum class LockDataType { TABLE = 0, RECORD = 1 };
+enum class LockDataType { TABLE = 0, RECORD = 1};
+
+/* 用于标识行锁的具体类型：非行锁,next_key,gap,common_reord,插入意向锁*/
+enum class RecordLockType {NONE,ORDNINARY,GAP,NOT_GAP,INTENTION};
 
 /**
  * @description: 加锁对象的唯一标识
  */
 class LockDataId {
-   public:
-    /* 表级锁 */
-    LockDataId(int fd, LockDataType type) {
+public:
+    int fd_;                // 文件描述符
+    Rid rid_;               // 行锁的Rid
+    LockDataType type_;     // 锁的类型，表锁或行锁
+    RecordLockType lock_type_; // 行锁的具体类型
+
+    // 表级锁构造函数
+    LockDataId(int fd, LockDataType type)
+        : fd_(fd), type_(type), rid_({-1, -1}), lock_type_(RecordLockType::NONE) {
         assert(type == LockDataType::TABLE);
-        fd_ = fd;
-        type_ = type;
-        rid_.page_no = -1;
-        rid_.slot_no = -1;
     }
 
-    /* 行级锁 */
-    LockDataId(int fd, const Rid &rid, LockDataType type) {
+    // 行级锁构造函数
+    LockDataId(int fd, const Rid& rid, RecordLockType lock_type, LockDataType type)
+        : fd_(fd), rid_(rid), type_(type), lock_type_(lock_type) {
         assert(type == LockDataType::RECORD);
-        fd_ = fd;
-        rid_ = rid;
-        type_ = type;
     }
 
+    // 获取唯一标识，对于表级锁，可能不需要rid_信息
     inline int64_t Get() const {
         if (type_ == LockDataType::TABLE) {
-            // fd_
+            // 对于表级锁，只使用文件描述符
             return static_cast<int64_t>(fd_);
         } else {
-            // fd_, rid_.page_no, rid.slot_no
-            return ((static_cast<int64_t>(type_)) << 63) | ((static_cast<int64_t>(fd_)) << 31) |
-                   ((static_cast<int64_t>(rid_.page_no)) << 16) | rid_.slot_no;
+            // 对于行级锁，组合文件描述符、页面号、槽号和锁类型
+            return ((static_cast<int64_t>(lock_type_) & 0x7) << 60) |
+                   ((static_cast<int64_t>(fd_) & 0xFFFFFFFF) << 31) |
+                   ((static_cast<int64_t>(rid_.page_no) & 0xFFFF) << 15) |
+                   (static_cast<int64_t>(rid_.slot_no) & 0x7FFF);
         }
     }
 
-    bool operator==(const LockDataId &other) const {
-        if (type_ != other.type_) return false;
-        if (fd_ != other.fd_) return false;
-        return rid_ == other.rid_;
+    bool operator==(const LockDataId& other) const {
+        return fd_ == other.fd_ && rid_ == other.rid_ && type_ == other.type_ &&
+               lock_type_ == other.lock_type_;
     }
-    int fd_;
-    Rid rid_;
-    LockDataType type_;
 };
 
 template <>

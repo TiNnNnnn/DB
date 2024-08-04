@@ -11,6 +11,8 @@ See the Mulan PSL v2 for more details. */
 #pragma once
 
 #include <mutex>
+#include <vector>
+#include <algorithm>
 #include <condition_variable>
 #include "transaction/transaction.h"
 
@@ -22,6 +24,8 @@ class LockManager {
 
     /* 用于标识加锁队列中排他性最强的锁类型，例如加锁队列中有SHARED和EXLUSIVE两个加锁操作，则该队列的锁模式为X */
     enum class GroupLockMode { NON_LOCK, IS, IX, S, X, SIX};
+
+    
 
     /* 事务的加锁申请 */
     class LockRequest {
@@ -60,6 +64,32 @@ public:
     bool lock_IX_on_table(Transaction* txn, int tab_fd);
 
     bool unlock(Transaction* txn, LockDataId lock_data_id);
+private:
+    bool lock_internal(Transaction* txn, LockDataId lock_data_id,LockMode lock_mode);
+    bool can_grant_lock(const LockRequestQueue& queue,Transaction* txn, LockMode req_mode);
+    bool should_rollback(Transaction* txn, const LockRequestQueue& queue);
+
+    GroupLockMode get_group_lock_mode(LockMode mode) {
+        switch (mode) {
+            case LockMode::SHARED: return GroupLockMode::S;
+            case LockMode::EXLUCSIVE: return GroupLockMode::X;
+            case LockMode::INTENTION_SHARED: return GroupLockMode::IS;
+            case LockMode::INTENTION_EXCLUSIVE: return GroupLockMode::IX;
+            case LockMode::S_IX: return GroupLockMode::SIX;
+            default: return GroupLockMode::NON_LOCK;
+        }
+    }
+
+    std::array<std::array<bool, 6>, 6> LOCK_COMPATIBILITY_MATRIX = {
+        { //   NO,   IS,   IX,   S,     X,    SIX
+            { true, true, true, true, true, true },  // NO_LOCK
+            { true, true, true, true, false, false }, // IS
+            { true, true, true, false, false, false }, // IX
+            { true, true, false, true, false, false }, // S
+            { true, false, false, false, false, false }, // X
+            { true, false, false, false, false, true }  // SIX
+        }
+    };
 
 private:
     std::mutex latch_;      // 用于锁表的并发

@@ -60,6 +60,8 @@ class IxNodeHandle {
     IxPageHdr *page_hdr;            // page->data的第一部分，指针指向首地址，长度为sizeof(IxPageHdr)
     char *keys;                     // page->data的第二部分，指针指向首地址，长度为file_hdr->keys_size，每个key的长度为file_hdr->col_len
     Rid *rids;                      // page->data的第三部分，指针指向首地址
+    txn_id_t *txn_ids;
+    char* roll_pointers;
     std::mutex node_mutex_;
    public:
     IxNodeHandle() = default;
