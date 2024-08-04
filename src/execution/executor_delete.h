@@ -37,6 +37,7 @@ class DeleteExecutor : public AbstractExecutor {
     }
 
     std::unique_ptr<RmRecord> Next() override {
+        context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
         for (auto &rid : rids_) {
             // 获取要删除的记录
             std::unique_ptr<RmRecord> rec = fh_->get_record(rid, context_);

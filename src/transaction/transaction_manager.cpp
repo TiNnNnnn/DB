@@ -68,6 +68,7 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     //     }
     //     return;
     // }
+    
     //释放所有锁
     auto lock_set = txn->get_lock_set();
     for (auto& lock_data_id : *lock_set) {

@@ -76,7 +76,6 @@ bool LockManager::lock_IS_on_table(Transaction* txn, int tab_fd) {
 bool LockManager::lock_IX_on_table(Transaction* txn, int tab_fd) {
     LockDataId* id = new LockDataId(tab_fd,LockDataType::TABLE);
     return lock_internal(txn,*id , LockMode::INTENTION_EXCLUSIVE);
-    return true;
 }
 
 /**
@@ -86,8 +85,23 @@ bool LockManager::lock_IX_on_table(Transaction* txn, int tab_fd) {
  * @param {LockDataId} lock_data_id 要释放的锁ID
  */
 bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
-    
-    return true;
+   std::lock_guard<std::mutex> lock(latch_);
+   auto it = lock_table_.find(lock_data_id);
+   if (it != lock_table_.end()) {
+        auto& queue = it->second;
+        auto& request_queue = queue.request_queue_;
+        // 移除队列中该事务的所有锁请求
+        request_queue.remove_if([&txn](const LockRequest& request) {
+            return request.txn_id_ == txn->get_transaction_id();
+        });
+        update_group_lock_mode(queue);
+        //队列空了，唤醒其他等待的事务
+        if (request_queue.empty()) {
+            queue.cv_.notify_all();
+        }
+        return true;
+    }
+    return false;
 }
 
 bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMode lock_mode){
@@ -97,6 +111,9 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
     if(can_grant_lock(q,txn,lock_mode)){
         q.request_queue_.emplace_back(txn->get_transaction_id(),lock_mode);
         q.request_queue_.back().granted_ = true;
+
+        update_group_lock_mode(q);
+        txn->append_lock_set(lock_data_id);
         q.cv_.notify_all();
         return true;
     }else{
@@ -115,7 +132,7 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
 
 
 bool LockManager::can_grant_lock(const LockRequestQueue& queue,Transaction* txn, LockMode req_mode){
-    std::lock_guard<std::mutex> lock(latch_);
+    //std::lock_guard<std::mutex> lock(latch_);
     GroupLockMode requested_group_mode = get_group_lock_mode(req_mode);
     //INFO:group_lock_mode_记录该加锁队列中的排他性最强的锁类型
     if (LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(queue.group_lock_mode_)][static_cast<size_t>(requested_group_mode)]) {

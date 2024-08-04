@@ -91,6 +91,20 @@ private:
         }
     };
 
+    // 根据队列中的锁请求确定排他性最强锁
+    void update_group_lock_mode(LockRequestQueue& queue) {
+        GroupLockMode current_mode = GroupLockMode::NON_LOCK;
+        for (const auto& request : queue.request_queue_) {
+            if (request.granted_) {
+                GroupLockMode mode = get_group_lock_mode(request.lock_mode_);
+                if (mode > current_mode) {
+                    current_mode = mode;
+                }
+            }
+        }
+        queue.group_lock_mode_ = current_mode;
+    }
+
 private:
     std::mutex latch_;      // 用于锁表的并发
     std::unordered_map<LockDataId, LockRequestQueue> lock_table_;   // 全局锁表
