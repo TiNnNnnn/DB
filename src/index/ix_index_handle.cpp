@@ -702,10 +702,10 @@ bool IxIndexHandle::adjust_root(IxNodeHandle *old_root_node) {
     // 2. 如果old_root_node是叶结点，且大小为0，则直接更新root page
     if (old_root_node->is_leaf_page() && old_root_node->get_size() == 0) {
         // 更新根结点
-        file_hdr_->root_page_ = INVALID_PAGE_ID;
+        //file_hdr_->root_page_ = INVALID_PAGE_ID;
         // 释放原根节点
         buffer_pool_manager_->unpin_page(old_root_node->get_page_id(), false);
-        buffer_pool_manager_->delete_page(old_root_node->get_page_id());
+        //buffer_pool_manager_->delete_page(old_root_node->get_page_id());
 
         return true;
     }

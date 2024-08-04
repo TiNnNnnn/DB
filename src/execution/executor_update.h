@@ -91,8 +91,6 @@ class UpdateExecutor : public AbstractExecutor {
                 ih->insert_entry(new_key, rid, context_->txn_);
                 delete[] new_key;
             }
-
-            
             //加入write_set
             WriteRecord *wr = new WriteRecord (WType::UPDATE_TUPLE,tab_.name,rid,old_rec,*rec);
             context_->txn_->append_write_record(wr);

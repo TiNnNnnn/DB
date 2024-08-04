@@ -153,14 +153,14 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
                 int offset = 0;
                 // 构建索引键值
                 for (size_t j = 0; j < index.col_num; ++j) {
-                    memcpy(key + offset, w_set->GetRecord().data + index.cols[j].offset, index.cols[j].len);
+                    memcpy(key + offset, w_set->GetNewRecord().data + index.cols[j].offset, index.cols[j].len);
                     offset += index.cols[j].len;
                 }
                 idx_hdr->delete_entry(key,txn);
 
                 offset = 0;
                 for (size_t j = 0; j < index.col_num; ++j) {
-                    memcpy(key + offset, w_set->GetNewRecord().data + index.cols[j].offset, index.cols[j].len);
+                    memcpy(key + offset, w_set->GetRecord().data + index.cols[j].offset, index.cols[j].len);
                     offset += index.cols[j].len;
                 }
                 idx_hdr->insert_entry(key,w_set->GetRid(),txn);
