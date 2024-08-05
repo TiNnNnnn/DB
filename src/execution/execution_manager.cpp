@@ -151,8 +151,13 @@ std::vector<std::vector<std::string>> QlManager::select_from(std::unique_ptr<Abs
                             std::vector<AggregateExpr> sel_aggs,Context *context,bool is_son) {
     
     int tb_fd = sm_manager_->fhs_[sm_manager_->db_.get_table(sel_cols[0].tab_name).name]->GetFd();
-    context->lock_mgr_->lock_shared_on_table(context->txn_,tb_fd);                      
-    
+    //context->lock_mgr_->lock_IS_on_table(context->txn_,tb_fd);
+    bool ret = context->lock_mgr_->lock_shared_on_table(context->txn_,tb_fd);                    
+    if(!ret){
+        RecordPrinter rp(1);
+        rp.print_abort(context);
+        return std::vector<std::vector<std::string>>();
+    }
     //将待查询列名存储在captions
     std::vector<std::string> captions;
     captions.reserve(sel_cols.size());

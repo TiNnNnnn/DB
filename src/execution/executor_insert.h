@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 #include "execution_defs.h"
 #include "execution_manager.h"
 #include "executor_abstract.h"
+#include "record_printer.h"
 #include "index/ix.h"
 #include "system/sm.h"
 
@@ -39,8 +40,14 @@ class InsertExecutor : public AbstractExecutor {
     };
 
     std::unique_ptr<RmRecord> Next() override {
+        //context_->lock_mgr_->lock_IX_on_table(context_->txn_,fh_->GetFd());
+        bool ret = context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
+        if(!ret){
+            RecordPrinter rp(1);
+            rp.print_abort(context_);
+            return nullptr;
+        }
 
-        context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
         // Make record buffer
         RmRecord rec(fh_->get_file_hdr().record_size);
         for (size_t i = 0; i < values_.size(); i++) {
@@ -53,7 +60,6 @@ class InsertExecutor : public AbstractExecutor {
                 }else{
                      throw IncompatibleTypeError(coltype2str(col.type), coltype2str(val.type));
                 }
-               
             }
             val.init_raw(col.len);
             memcpy(rec.data + col.offset, val.raw->data, col.len);

@@ -85,4 +85,10 @@ public:
         memcpy(context->data_send_ + *(context->offset_), str.c_str(), str.length());
         *(context->offset_) = *(context->offset_) + str.length();
     }
+
+    static void print_abort(Context *context){
+        std::string str = "abort\n";
+        memcpy(context->data_send_ + *(context->offset_), str.c_str(), str.length());
+        *(context->offset_) = *(context->offset_) + str.length();
+    }
 };

@@ -9,6 +9,7 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 #include "lock_manager.h"
+#include <algorithm>
 
 /**
  * @description: 申请行级共享锁
@@ -107,8 +108,29 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
 bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMode lock_mode){
     std::lock_guard<std::mutex>lock(latch_);
     auto& q = lock_table_[lock_data_id];
+
+     // 获取事务当前持有的锁集合
+    auto ls = txn->get_lock_set();
+    // 检查事务是否已经持有相同类型的锁
+    if (ls->find(lock_data_id) != ls->end()) {
+        // 事务已经持有锁，检查是否与请求的锁类型相同
+        auto& existing_locks = lock_table_[lock_data_id].request_queue_;
+        for (auto& request : existing_locks) {
+            if (request.txn_id_ == txn->get_transaction_id() && request.lock_mode_ == lock_mode) {
+                // 事务已经持有相同类型的锁，不需要再次授予
+                q.cv_.notify_all(); 
+                return true;
+            }else if(request.txn_id_ == txn->get_transaction_id() && request.lock_mode_ == LockMode::EXLUCSIVE && lock_mode == LockMode::SHARED){
+                //事务已经持有X锁，不需要再申请S锁
+                q.cv_.notify_all(); 
+                return true;
+            }
+        }
+    }
+
     //判定是否可以授予锁
     if(can_grant_lock(q,txn,lock_mode)){
+
         q.request_queue_.emplace_back(txn->get_transaction_id(),lock_mode);
         q.request_queue_.back().granted_ = true;
 
@@ -118,6 +140,7 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
         return true;
     }else{
         if(should_rollback(txn,q)){
+
             return false;
         }
         q.request_queue_.emplace_back(txn->get_transaction_id(), lock_mode);
@@ -126,6 +149,15 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
         q.cv_.wait(unique_lock,[this,&q,txn,lock_mode]{
             return q.request_queue_.empty() || can_grant_lock(q,txn,lock_mode);
         });
+
+        // 唤醒后再次检查是否可以授予锁
+        if (can_grant_lock(q, txn, lock_mode)) {
+            q.request_queue_.back().granted_ = true;
+            update_group_lock_mode(q);
+            txn->append_lock_set(lock_data_id);
+            q.cv_.notify_all();
+            return true;
+        }
         return false;
     }
 }

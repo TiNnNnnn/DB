@@ -12,6 +12,7 @@ See the Mulan PSL v2 for more details. */
 #include "execution_defs.h"
 #include "execution_manager.h"
 #include "executor_abstract.h"
+#include "record_printer.h"
 #include "index/ix.h"
 #include "system/sm.h"
 
@@ -39,7 +40,13 @@ class UpdateExecutor : public AbstractExecutor {
     }
     
     std::unique_ptr<RmRecord> Next() override {
-        context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
+        //context_->lock_mgr_->lock_IX_on_table(context_->txn_,fh_->GetFd());
+        bool ret = context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
+        if(!ret){
+            RecordPrinter rp(1);
+            rp.print_abort(context_);
+            return nullptr;
+        }
         for (auto &rid : rids_) {
             // 获取要更新的记录
             std::unique_ptr<RmRecord> rec = fh_->get_record(rid, context_);
