@@ -42,18 +42,18 @@ class UpdateExecutor : public AbstractExecutor {
     std::unique_ptr<RmRecord> Next() override {
         //context_->lock_mgr_->lock_IX_on_table(context_->txn_,fh_->GetFd());
         bool ret = context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
-        if(!ret){
-            RecordPrinter rp(1);
-            rp.print_abort(context_);
+        // if(!ret){
+        //     RecordPrinter rp(1);
+        //     rp.print_abort(context_);
 
-            std::fstream outfile;
-            std::string out_file_name = sm_manager_->get_db_name() + "/output.txt";
-            outfile.open(out_file_name, std::ios::out | std::ios::app);
-            outfile << "abort\n";
-            outfile.close();
-            
-            return nullptr;
-        }
+        //     std::fstream outfile;
+        //     std::string out_file_name = sm_manager_->get_db_name() + "/output.txt";
+        //     outfile.open(out_file_name, std::ios::out | std::ios::app);
+        //     outfile << "abort\n";
+        //     outfile.close();
+
+        //     return nullptr;
+        // }
         for (auto &rid : rids_) {
             // 获取要更新的记录
             std::unique_ptr<RmRecord> rec = fh_->get_record(rid, context_);

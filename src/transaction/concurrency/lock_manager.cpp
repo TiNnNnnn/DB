@@ -9,7 +9,9 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 #include "lock_manager.h"
+#include "transaction/txn_defs.h"
 #include <algorithm>
+
 
 /**
  * @description: 申请行级共享锁
@@ -79,6 +81,9 @@ bool LockManager::lock_IX_on_table(Transaction* txn, int tab_fd) {
     return lock_internal(txn,*id , LockMode::INTENTION_EXCLUSIVE);
 }
 
+
+
+
 /**
  * @description: 释放锁
  * @return {bool} 返回解锁是否成功
@@ -107,12 +112,17 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
     auto& q = lock_table_[lock_data_id];
 
     // 获取事务当前持有的锁集合
-    auto ls = txn->get_lock_set();
+    auto& ls = txn->get_lock_set();
+    int x_count = 0;
     // 检查事务是否已经持有相同类型的锁
     if (ls->find(lock_data_id) != ls->end()) {
         // 事务已经持有锁，检查是否与请求的锁类型相同
         auto& existing_locks = lock_table_[lock_data_id].request_queue_;
         for (auto& request : existing_locks) {
+            if(request.lock_mode_ == LockMode::EXLUCSIVE){
+                x_count++;
+            }
+
             if (request.txn_id_ == txn->get_transaction_id() && request.lock_mode_ == lock_mode) {
                 // 事务已经持有相同类型的锁，不需要再次授予
                 q.cv_.notify_all(); 
@@ -121,9 +131,16 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
                 //事务已经持有X锁，不需要再申请S锁
                 q.cv_.notify_all(); 
                 return true;
+            }else if (request.txn_id_ == txn->get_transaction_id() && request.lock_mode_ == LockMode::SHARED && lock_mode == LockMode::EXLUCSIVE && x_count == 0){
+                //锁升级
+                request.lock_mode_ = LockMode::EXLUCSIVE;
+                update_group_lock_mode(q);
+                q.cv_.notify_all();
+                return true; 
             }
         }
     }
+
     //判定是否可以授予锁
     if(can_grant_lock(q,txn,lock_mode)){
         q.request_queue_.emplace_back(txn->get_transaction_id(),lock_mode);
@@ -133,8 +150,8 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
         q.cv_.notify_all();
         return true;
     }else{
-        if(should_rollback(txn,q))
-            return false;
+        if(should_rollback(txn,q,lock_mode))
+            throw TransactionAbortException(txn->get_transaction_id(),AbortReason::DEADLOCK_PREVENTION);
         q.request_queue_.emplace_back(txn->get_transaction_id(), lock_mode);
         //等待锁被授予或者需要回滚的信号
         //std::unique_lock<std::mutex>unique_lock(latch_);
@@ -153,7 +170,6 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
     }
 }
 
-
 bool LockManager::can_grant_lock(const LockRequestQueue& queue,Transaction* txn, LockMode req_mode){
     //std::lock_guard<std::mutex> lock(latch_);
     GroupLockMode requested_group_mode = get_group_lock_mode(req_mode);
@@ -161,8 +177,11 @@ bool LockManager::can_grant_lock(const LockRequestQueue& queue,Transaction* txn,
     if (LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(queue.group_lock_mode_)][static_cast<size_t>(requested_group_mode)]) {
             // 检查是否存在优先级更高的等待事务
             for (auto& req : queue.request_queue_) {
-                if (req.txn_id_ != txn->get_transaction_id() && req.txn_id_ < txn->get_transaction_id() &&
-                    LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(req.lock_mode_)][static_cast<size_t>(requested_group_mode)]) {
+                // if (req.txn_id_ != txn->get_transaction_id() && req.txn_id_ < txn->get_transaction_id() &&
+                //     LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(req.lock_mode_)][static_cast<size_t>(requested_group_mode)] == false) {
+                //     return false; 
+                // }
+                if (LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(req.lock_mode_)][static_cast<size_t>(requested_group_mode)] == false) {
                     return false; 
                 }
             }
@@ -171,10 +190,10 @@ bool LockManager::can_grant_lock(const LockRequestQueue& queue,Transaction* txn,
     return false;
 }
 
-bool LockManager::should_rollback(Transaction* txn, const LockRequestQueue& queue){
+bool LockManager::should_rollback(Transaction* txn, const LockRequestQueue& queue,LockMode lock_mode){
     // 检查队列中的所有锁请求，如果存在优先级更高的事务，则当前事务应该回滚
     for(const auto& req: queue.request_queue_){
-        if(req.txn_id_ != txn->get_transaction_id() && req.granted_ && txn->get_transaction_id() > req.txn_id_){
+        if(req.txn_id_ != txn->get_transaction_id() && req.granted_ && txn->get_transaction_id() > req.txn_id_ && req.lock_mode_ == lock_mode){
             return true;
         }
     }

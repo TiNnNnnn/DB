@@ -55,6 +55,9 @@ public:
 
     bool lock_exclusive_on_record(Transaction* txn, const Rid& rid, int tab_fd);
 
+    //TODO：how to describe a record gap lock
+    bool lock_exclusive_on_record_gap(Transaction* txn,const Rid& rid,int tab_fd);
+
     bool lock_shared_on_table(Transaction* txn, int tab_fd);
 
     bool lock_exclusive_on_table(Transaction* txn, int tab_fd);
@@ -67,7 +70,7 @@ public:
 private:
     bool lock_internal(Transaction* txn, LockDataId lock_data_id,LockMode lock_mode);
     bool can_grant_lock(const LockRequestQueue& queue,Transaction* txn, LockMode req_mode);
-    bool should_rollback(Transaction* txn, const LockRequestQueue& queue);
+    bool should_rollback(Transaction* txn, const LockRequestQueue& queue,LockMode lock_mode);
 
     GroupLockMode get_group_lock_mode(LockMode mode) {
         switch (mode) {
