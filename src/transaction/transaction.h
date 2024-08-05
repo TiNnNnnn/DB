@@ -61,10 +61,7 @@ class Transaction {
 
     inline std::shared_ptr<std::unordered_set<LockDataId>>& get_lock_set() { return lock_set_; }
     inline void append_lock_set(LockDataId id){
-        auto [iter,b] = lock_set_->insert(id);
-        if(!b){
-            throw InternalError("insert into lock_set failed");
-        }
+        lock_set_->insert(id);
     }
 
    private:

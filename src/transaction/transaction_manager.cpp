@@ -59,15 +59,6 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     // 4. 把事务日志刷入磁盘中
     // 5. 更新事务状态
     RmManager* rm_mgr =  sm_manager_->get_rm_manager();
-    //提交所有未提交的写操作
-    // if (txn->get_write_set()->size() == 0) {
-    //     txn->set_state(TransactionState::COMMITTED);
-    //     {
-    //         std::unique_lock<std::mutex> lock(latch_);
-    //         txn_map.erase(txn->get_transaction_id());
-    //     }
-    //     return;
-    // }
     
     //释放所有锁
     auto lock_set = txn->get_lock_set();

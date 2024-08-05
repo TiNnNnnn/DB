@@ -125,8 +125,15 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
 
             if (request.txn_id_ == txn->get_transaction_id() && request.lock_mode_ == lock_mode) {
                 // 事务已经持有相同类型的锁，不需要再次授予
-                q.cv_.notify_all(); 
-                return true;
+                if(lock_mode == LockMode::EXLUCSIVE){
+                    q.cv_.notify_all(); 
+                    return true;
+                }else if(lock_mode == LockMode::SHARED && x_count == 0){
+                    q.cv_.notify_all(); 
+                    return true;
+                }
+                break;
+                
             }else if(request.txn_id_ == txn->get_transaction_id() && request.lock_mode_ == LockMode::EXLUCSIVE && lock_mode == LockMode::SHARED){
                 //事务已经持有X锁，不需要再申请S锁
                 q.cv_.notify_all(); 
