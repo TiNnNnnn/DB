@@ -96,9 +96,7 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
             return request.txn_id_ == txn->get_transaction_id();
         });
         update_group_lock_mode(queue);
-
         queue.cv_.notify_all();
-      
         return true;
     }
     return false;
@@ -126,13 +124,10 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
             }
         }
     }
-
     //判定是否可以授予锁
     if(can_grant_lock(q,txn,lock_mode)){
-
         q.request_queue_.emplace_back(txn->get_transaction_id(),lock_mode);
         q.request_queue_.back().granted_ = true;
-
         update_group_lock_mode(q);
         txn->append_lock_set(lock_data_id);
         q.cv_.notify_all();
@@ -146,7 +141,6 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
         q.cv_.wait(unique_lock,[this,&q,txn,lock_mode]{
             return q.request_queue_.empty() || can_grant_lock(q,txn,lock_mode);
         });
-
         // 唤醒后再次检查是否可以授予锁
         if (can_grant_lock(q, txn, lock_mode)) {
             q.request_queue_.back().granted_ = true;

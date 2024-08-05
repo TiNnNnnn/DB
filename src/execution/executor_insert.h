@@ -45,6 +45,13 @@ class InsertExecutor : public AbstractExecutor {
         if(!ret){
             RecordPrinter rp(1);
             rp.print_abort(context_);
+
+            std::fstream outfile;
+            std::string out_file_name = sm_manager_->get_db_name() + "/output.txt";
+            outfile.open(out_file_name, std::ios::out | std::ios::app);
+            outfile << "abort\n";
+            outfile.close();
+            
             return nullptr;
         }
 
