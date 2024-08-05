@@ -96,20 +96,19 @@ bool LockManager::unlock(Transaction* txn, LockDataId lock_data_id) {
             return request.txn_id_ == txn->get_transaction_id();
         });
         update_group_lock_mode(queue);
-        //队列空了，唤醒其他等待的事务
-        if (request_queue.empty()) {
-            queue.cv_.notify_all();
-        }
+
+        queue.cv_.notify_all();
+      
         return true;
     }
     return false;
 }
 
 bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMode lock_mode){
-    std::lock_guard<std::mutex>lock(latch_);
+    std::unique_lock<std::mutex>unique_lock(latch_);
     auto& q = lock_table_[lock_data_id];
 
-     // 获取事务当前持有的锁集合
+    // 获取事务当前持有的锁集合
     auto ls = txn->get_lock_set();
     // 检查事务是否已经持有相同类型的锁
     if (ls->find(lock_data_id) != ls->end()) {
@@ -139,13 +138,11 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
         q.cv_.notify_all();
         return true;
     }else{
-        if(should_rollback(txn,q)){
-
+        if(should_rollback(txn,q))
             return false;
-        }
         q.request_queue_.emplace_back(txn->get_transaction_id(), lock_mode);
         //等待锁被授予或者需要回滚的信号
-        std::unique_lock<std::mutex>unique_lock(latch_);
+        //std::unique_lock<std::mutex>unique_lock(latch_);
         q.cv_.wait(unique_lock,[this,&q,txn,lock_mode]{
             return q.request_queue_.empty() || can_grant_lock(q,txn,lock_mode);
         });
