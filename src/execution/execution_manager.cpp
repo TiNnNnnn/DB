@@ -248,7 +248,11 @@ std::vector<std::vector<std::string>> QlManager::select_from(std::unique_ptr<Abs
                 if(agg.func_name == "COUNT"){
                     agg_str = std::to_string(*(int *)rec_buf);
                 }else{
-                    agg_str = std::to_string(*(float *)rec_buf);
+                    auto col_meta = sm_manager_->db_.get_table(tb_name).get_col(agg.cols[0].col_name);
+                    if(col_meta->type == TYPE_FLOAT)
+                        agg_str = std::to_string(*(float*)rec_buf);
+                    else if(col_meta->type == TYPE_INT)
+                        agg_str = std::to_string(*(int*)rec_buf);
                 }
                 columns.push_back(agg_str);
                 temp_offset+=4;

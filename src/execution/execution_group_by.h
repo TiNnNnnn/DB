@@ -124,21 +124,63 @@ public:
                     }
                     
                 } else if (agg_expr.func_name == "SUM") {
-                    float sum_value = result.sum;
-                    memcpy(record->data + offset, &sum_value, sizeof(float));
-                    offset += sizeof(float);
+                    ColType c_type;
+                    for(auto e : cols_){
+                        if(agg_expr.cols[0].col_name == e.name){
+                            c_type = e.type;
+                            break;
+                        }
+                    }
+                    if(c_type == TYPE_FLOAT){
+                        float sum_value = result.sum;
+                        memcpy(record->data + offset, &sum_value, sizeof(float));
+                        offset += sizeof(float);
+                    }else if(c_type == TYPE_INT){
+                        int sum_value = int(result.sum);
+                        memcpy(record->data + offset, &sum_value, sizeof(int));
+                        offset += sizeof(int);
+                    }
+                    
                 } else if (agg_expr.func_name == "AVG") {
                     float avg_value = result.sum_for_avg / result.count_for_avg;
                     memcpy(record->data + offset, &avg_value, sizeof(float));
                     offset += sizeof(float);
                 } else if (agg_expr.func_name == "MAX") {
-                    float max_value = result.max;
-                    memcpy(record->data + offset, &max_value, sizeof(float));
-                    offset += sizeof(float);
+                    ColType c_type;
+                    for(auto e : cols_){
+                        if(agg_expr.cols[0].col_name == e.name){
+                            c_type = e.type;
+                            break;
+                        }
+                    }
+                    if(c_type == TYPE_FLOAT){
+                        float max_value = result.max;
+                        memcpy(record->data + offset, &max_value, sizeof(float));
+                        offset += sizeof(float);
+                    }else if(c_type == TYPE_INT){
+                        int max_value = int(result.max);
+                        memcpy(record->data + offset, &max_value, sizeof(int));
+                        offset += sizeof(int);
+                    }
+                    
                 } else if (agg_expr.func_name == "MIN") {
-                    float min_value = result.min;
-                    memcpy(record->data + offset, &min_value, sizeof(float));
-                    offset += sizeof(float);
+                    ColType c_type;
+                    for(auto e : cols_){
+                        if(agg_expr.cols[0].col_name == e.name){
+                            c_type = e.type;
+                            break;
+                        }
+                    }
+                    if(c_type == TYPE_FLOAT){
+                        float min_value = result.min;
+                        memcpy(record->data + offset, &min_value, sizeof(float));
+                        offset += sizeof(float);
+                    }else if(c_type == TYPE_INT){
+                        int min_value = int(result.min);
+                        memcpy(record->data + offset, &min_value, sizeof(int));
+                        offset += sizeof(int);
+                    }
+                    
                 }
             }
             return record;
