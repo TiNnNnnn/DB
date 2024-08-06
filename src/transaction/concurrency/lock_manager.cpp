@@ -139,11 +139,11 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
                 q.cv_.notify_all(); 
                 return true;
             }else if (request.txn_id_ == txn->get_transaction_id() && request.lock_mode_ == LockMode::SHARED && lock_mode == LockMode::EXLUCSIVE && x_count == 0){
-                //锁升级
-                request.lock_mode_ = LockMode::EXLUCSIVE;
-                update_group_lock_mode(q);
-                q.cv_.notify_all();
-                return true; 
+                // //锁升级
+                // request.lock_mode_ = LockMode::EXLUCSIVE;
+                // update_group_lock_mode(q);
+                // q.cv_.notify_all();
+                // return true; 
             }
         }
     }
@@ -183,10 +183,6 @@ bool LockManager::can_grant_lock(const LockRequestQueue& queue,Transaction* txn,
     if (LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(queue.group_lock_mode_)][static_cast<size_t>(requested_group_mode)]) {
             // 检查是否存在优先级更高的等待事务
             for (auto& req : queue.request_queue_) {
-                // if (req.txn_id_ != txn->get_transaction_id() && req.txn_id_ < txn->get_transaction_id() &&
-                //     LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(req.lock_mode_)][static_cast<size_t>(requested_group_mode)] == false) {
-                //     return false; 
-                // }
                 if (req.granted_ && !LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(req.lock_mode_)][static_cast<size_t>(requested_group_mode)]) {
                     return false; 
                 }
