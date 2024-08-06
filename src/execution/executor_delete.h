@@ -40,22 +40,13 @@ class DeleteExecutor : public AbstractExecutor {
     std::unique_ptr<RmRecord> Next() override {
         //context_->lock_mgr_->lock_IX_on_table(context_->txn_,fh_->GetFd());
         bool ret = context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
-        // if(!ret){
-        //     RecordPrinter rp(1);
-        //     rp.print_abort(context_);
-
-        //     std::fstream outfile;
-        //     std::string out_file_name = sm_manager_->get_db_name() + "/output.txt";
-        //     outfile.open(out_file_name, std::ios::out | std::ios::app);
-        //     outfile << "abort\n";
-        //     outfile.close();
-
-        //     return nullptr;
-        // }
+        
         for (auto &rid : rids_) {
             // 获取要删除的记录
             std::unique_ptr<RmRecord> rec = fh_->get_record(rid, context_);
-            if(!rec) return nullptr;
+            if(!rec) {
+                throw RecordNotFoundError(rid.page_no,rid.slot_no);
+            }
 
             //加入write_set
             WriteRecord *wr = new WriteRecord(WType::DELETE_TUPLE,tab_.name,rid,*rec,*rec);

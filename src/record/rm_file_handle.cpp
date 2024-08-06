@@ -149,20 +149,16 @@ void RmFileHandle::update_record(const Rid& rid, char* buf, Context* context) {
     // 2. 更新记录
     // 1. 获取指定记录所在的page handle
     RmPageHandle page_handle = fetch_page_handle(rid.page_no);
-
     // 2. 检查指定位置是否有记录
     if (!Bitmap::is_set(page_handle.bitmap, rid.slot_no)) {
         throw std::runtime_error("The specified slot does not contain a record.");
     }
-
     // 3. 更新指定slot位置的数据
     char* slot = page_handle.get_slot(rid.slot_no);
     memcpy(slot, buf, file_hdr_.record_size);
-
     // 4. 标记页面为脏页
    page_handle.page->set_dirty(true);
    buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), true);
-
 }
 
 /**
