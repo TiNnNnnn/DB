@@ -114,15 +114,19 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
     // 获取事务当前持有的锁集合
     auto& ls = txn->get_lock_set();
     int x_count = 0;
+    int x_count_waiting = 0;
     // 检查事务是否已经持有相同类型的锁
     if (ls->find(lock_data_id) != ls->end()) {
         // 事务已经持有锁，检查是否与请求的锁类型相同
         auto& existing_locks = lock_table_[lock_data_id].request_queue_;
-        for (auto& request : existing_locks) {
+
+        for(auto& request : existing_locks){
             if(request.lock_mode_ == LockMode::EXLUCSIVE){
                 x_count++;
             }
+        }
 
+        for (auto& request : existing_locks) {
             if (request.txn_id_ == txn->get_transaction_id() && request.lock_mode_ == lock_mode) {
                 // 事务已经持有相同类型的锁，不需要再次授予
                 if(lock_mode == LockMode::EXLUCSIVE){
@@ -139,11 +143,11 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
                 q.cv_.notify_all(); 
                 return true;
             }else if (request.txn_id_ == txn->get_transaction_id() && request.lock_mode_ == LockMode::SHARED && lock_mode == LockMode::EXLUCSIVE && x_count == 0){
-                // //锁升级
-                // request.lock_mode_ = LockMode::EXLUCSIVE;
-                // update_group_lock_mode(q);
-                // q.cv_.notify_all();
-                // return true; 
+                //锁升级
+                request.lock_mode_ = LockMode::EXLUCSIVE;
+                update_group_lock_mode(q);
+                q.cv_.notify_all();
+                return true; 
             }
         }
     }
