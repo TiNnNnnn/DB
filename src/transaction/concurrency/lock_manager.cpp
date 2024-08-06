@@ -161,7 +161,6 @@ bool LockManager::lock_internal(Transaction* txn, LockDataId lock_data_id,LockMo
             throw TransactionAbortException(txn->get_transaction_id(),AbortReason::DEADLOCK_PREVENTION);
         q.request_queue_.emplace_back(txn->get_transaction_id(), lock_mode);
         //等待锁被授予或者需要回滚的信号
-        //std::unique_lock<std::mutex>unique_lock(latch_);
         q.cv_.wait(unique_lock,[this,&q,txn,lock_mode]{
             return q.request_queue_.empty() || can_grant_lock(q,txn,lock_mode);
         });
@@ -188,7 +187,7 @@ bool LockManager::can_grant_lock(const LockRequestQueue& queue,Transaction* txn,
                 //     LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(req.lock_mode_)][static_cast<size_t>(requested_group_mode)] == false) {
                 //     return false; 
                 // }
-                if (LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(req.lock_mode_)][static_cast<size_t>(requested_group_mode)] == false) {
+                if (req.granted_ && !LOCK_COMPATIBILITY_MATRIX[static_cast<size_t>(req.lock_mode_)][static_cast<size_t>(requested_group_mode)]) {
                     return false; 
                 }
             }
