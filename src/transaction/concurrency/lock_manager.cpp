@@ -199,7 +199,7 @@ bool LockManager::can_grant_lock(const LockRequestQueue& queue,Transaction* txn,
 bool LockManager::should_rollback(Transaction* txn, const LockRequestQueue& queue,LockMode lock_mode){
     // 检查队列中的所有锁请求，如果存在优先级更高的事务，则当前事务应该回滚
     for(const auto& req: queue.request_queue_){
-        if(req.txn_id_ != txn->get_transaction_id() && req.granted_ && txn->get_transaction_id() > req.txn_id_ && req.lock_mode_ == lock_mode){
+        if(req.txn_id_ != txn->get_transaction_id() && txn->get_transaction_id() > req.txn_id_ && req.lock_mode_ == lock_mode){
             return true;
         }
     }
