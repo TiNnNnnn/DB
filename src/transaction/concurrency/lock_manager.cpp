@@ -81,9 +81,6 @@ bool LockManager::lock_IX_on_table(Transaction* txn, int tab_fd) {
     return lock_internal(txn,*id , LockMode::INTENTION_EXCLUSIVE);
 }
 
-
-
-
 /**
  * @description: 释放锁
  * @return {bool} 返回解锁是否成功

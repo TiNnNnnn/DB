@@ -42,18 +42,6 @@ class InsertExecutor : public AbstractExecutor {
     std::unique_ptr<RmRecord> Next() override {
         //context_->lock_mgr_->lock_IX_on_table(context_->txn_,fh_->GetFd());
         bool ret = context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
-        // if(!ret){
-        //     RecordPrinter rp(1);
-        //     rp.print_abort(context_);
-
-        //     std::fstream outfile;
-        //     std::string out_file_name = sm_manager_->get_db_name() + "/output.txt";
-        //     outfile.open(out_file_name, std::ios::out | std::ios::app);
-        //     outfile << "abort\n";
-        //     outfile.close();
-
-        //     return nullptr;
-        // }
 
         // Make record buffer
         RmRecord rec(fh_->get_file_hdr().record_size);

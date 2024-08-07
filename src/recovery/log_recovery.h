@@ -23,6 +23,25 @@ public:
     std::vector<lsn_t> redo_logs_;   // 在该page上需要redo的操作的lsn
 };
 
+// class RedoLogBlockHead{
+//     int id_;
+//     int offset_;
+//     int block_first_rec_group_;
+//     int checkout_no_;
+    
+// };
+// class RedoLogBlockTailer{
+//     int checksum_;
+// };
+
+// //Redo日志页
+// class RedoLogBlock{
+//     RedoLogBlockHead head_;
+//     char* block_boby_;
+//     RedoLogBlockTailer tailer_;
+// };
+
+
 class RecoveryManager {
 public:
     RecoveryManager(DiskManager* disk_manager, BufferPoolManager* buffer_pool_manager, SmManager* sm_manager) {

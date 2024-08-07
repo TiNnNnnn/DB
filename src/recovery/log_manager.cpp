@@ -19,7 +19,8 @@ See the Mulan PSL v2 for more details. */
 lsn_t LogManager::add_log_to_buffer(LogRecord* log_record) {
     std::unique_lock<std::mutex> lock(latch_);
     // 为日志记录分配一个全局唯一的LSN
-    lsn_t lsn = global_lsn_++;
+    lsn_t lsn = global_lsn_;
+   
     log_record->lsn_ = lsn;
     // 序列化日志记录
     int log_size = log_record->log_tot_len_;
@@ -32,6 +33,10 @@ lsn_t LogManager::add_log_to_buffer(LogRecord* log_record) {
     // 将日志记录添加到缓冲区
     memcpy(log_buffer_.buffer_ + log_buffer_.offset_, log_data, log_size);
     log_buffer_.offset_ += log_size;
+    
+    log_record->prev_lsn_ = prev_lsn_; 
+    global_lsn_+= sizeof(log_data);
+    prev_lsn_ = lsn;
 
     delete[] log_data;
     return lsn;
@@ -39,13 +44,13 @@ lsn_t LogManager::add_log_to_buffer(LogRecord* log_record) {
 
 /**
  * @description: 把日志缓冲区的内容刷到磁盘中，由于目前只设置了一个缓冲区，因此需要阻塞其他日志操作
- */
+*/
 void LogManager::flush_log_to_disk() {
     std::unique_lock<std::mutex> lock(latch_);
     if (log_buffer_.offset_ > 0) {
         disk_manager_->write_log(log_buffer_.buffer_, log_buffer_.offset_);
         // 更新已持久化的LSN
-        persist_lsn_ = global_lsn_ - 1;
+        flushed_to_disk_lsn = global_lsn_;
         // 重置缓冲区
         log_buffer_.offset_ = 0;
         memset(log_buffer_.buffer_, 0, sizeof(log_buffer_.buffer_));

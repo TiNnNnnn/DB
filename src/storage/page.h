@@ -72,7 +72,6 @@ class Page {
     void set_dirty(bool is_dirty){is_dirty_ = is_dirty;}
 
 
-
     static constexpr size_t OFFSET_PAGE_START = 0;
     static constexpr size_t OFFSET_LSN = 0;
     static constexpr size_t OFFSET_PAGE_HDR = 4;
@@ -97,4 +96,8 @@ class Page {
 
     /** The pin count of this page. */
     int pin_count_ = 0;
+
+    /**redo log**/
+    lsn_t oldest_modification;
+    lsn_t newest_modification;
 };

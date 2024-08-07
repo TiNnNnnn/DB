@@ -9,6 +9,8 @@ MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE.
 See the Mulan PSL v2 for more details. */
 
 #include "buffer_pool_manager.h"
+#include <algorithm>
+#include <chrono>
 
 /**
  * @description: 从free_list或replacer中得到可淘汰帧页的 *frame_id
@@ -51,6 +53,7 @@ void BufferPoolManager::update_page(Page *page, PageId new_page_id, frame_id_t n
     std::lock_guard<std::mutex> guard(latch_);
     if (page->is_dirty()){
         //write dirty page back to disk
+        del_from_flush_list(page);
         disk_manager_->write_page(page->id_.fd,page->id_.page_no,page->data_,PAGE_SIZE);
     }
     page_table_.erase(page->id_);
@@ -59,6 +62,18 @@ void BufferPoolManager::update_page(Page *page, PageId new_page_id, frame_id_t n
     page->is_dirty_ = false;
 
     disk_manager_->read_page(new_page_id.fd,new_page_id.page_no,page->data_ ,PAGE_SIZE);
+}
+
+/**
+    @description: 将脏页从flush_list中删除（脏页需要flush到磁盘前调用）
+**/
+bool BufferPoolManager::del_from_flush_list(Page* page){
+    frame_id_t frame_id = page_table_[page->id_];
+    auto iter = std::find(flush_list_.begin(),flush_list_.end(),frame_id);
+    if(iter == flush_list_.end())
+        throw InternalError("dirty page not in flush page!");
+    flush_list_.erase(iter);
+    return true;
 }
 
 /**
@@ -97,15 +112,14 @@ Page* BufferPoolManager::fetch_page(PageId page_id) {
         Page *page = &pages_[frame_id];
         // 2. 若获得的可用 frame 存储的为 dirty page，则调用 updata_page 将 page 写回到磁盘
         if (page->is_dirty_) {
-           disk_manager_->write_page(page->id_.fd, page->id_.page_no, page->data_, PAGE_SIZE);
-           
+            del_from_flush_list(page);
+            disk_manager_->write_page(page->id_.fd, page->id_.page_no, page->data_, PAGE_SIZE);
         }
         page_table_.erase(page->id_);
         // 3. 调用 disk_manager_ 的 read_page 读取目标页到 frame
         disk_manager_->read_page(page_id.fd, page_id.page_no, page->data_, PAGE_SIZE);
         
         // 4. 固定目标页，更新 pin_count_
-       
         replacer_->pin(frame_id);
         page->id_ = page_id;
         page->is_dirty_ = false;
@@ -156,6 +170,12 @@ bool BufferPoolManager::unpin_page(PageId page_id, bool is_dirty) {
     // 3. 根据参数is_dirty，更改is_dirty_
     if (is_dirty) {
         page->is_dirty_ = true;
+        //将脏页加入到flush_list (在flush_list不一定在lru_list中，原因在于只有在没有线程使用
+        //page时才能够加入lru_list)
+        auto iter = std::find(flush_list_.begin(),flush_list_.end(),frame_id);
+        //如果脏页已经存在于flush_list中，不需要重复插入
+        if(iter != flush_list_.end())
+            flush_list_.push_front(frame_id);
     }
     return true;
 }
@@ -184,6 +204,7 @@ bool BufferPoolManager::flush_page(PageId page_id) {
     frame_id_t frame_id = it->second;
     Page *page = &pages_[frame_id];
     // 2. 将页面写回磁盘
+    del_from_flush_list(page);
     disk_manager_->write_page(page_id.fd, page_id.page_no, page->data_, PAGE_SIZE);
     // 3. 更新页面的is_dirty状态
     page->is_dirty_ = false;
@@ -214,6 +235,7 @@ Page* BufferPoolManager::new_page(PageId* page_id,int pno) {
     else page_id->page_no = pno;
     // 3. 将frame的数据写回磁盘（如果frame是脏页）
     if (page->is_dirty_) {
+        del_from_flush_list(page);
         disk_manager_->write_page(page->id_.fd, page->id_.page_no, page->data_, PAGE_SIZE);
     }
 
@@ -256,6 +278,7 @@ bool BufferPoolManager::delete_page(PageId page_id) {
     }
     // 3. 将目标页数据写回磁盘
     if (page->is_dirty_) {
+        del_from_flush_list(page);
         disk_manager_->write_page(page_id.fd, page_id.page_no, page->data_, PAGE_SIZE);
     }
     // 4. 从页表中删除目标页
@@ -265,7 +288,6 @@ bool BufferPoolManager::delete_page(PageId page_id) {
     page->is_dirty_ = false;
     page->pin_count_ = 0;
     page->reset_memory();
-
     // 6. 将其加入free_list_
     free_list_.push_back(frame_id);
     // 7. 返回true
@@ -287,6 +309,7 @@ void BufferPoolManager::flush_all_pages(int fd) {
 
             // 如果页面是脏页，则将其写回磁盘
             if (page->is_dirty_) {
+                del_from_flush_list(page);
                 disk_manager_->write_page(fd, page->id_.page_no, page->data_, PAGE_SIZE);
                 page->is_dirty_ = false; // 更新页面的脏状态
             }
@@ -308,4 +331,11 @@ void BufferPoolManager::delete_all_page(int fd){
         }
     }
 
+}
+
+//TODO
+void BufferPoolManager::gc(){
+    std::this_thread::sleep_for(std::chrono::seconds(2));
+
+    return;
 }

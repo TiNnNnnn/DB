@@ -22,10 +22,12 @@ enum LogType: int {
     UPDATE = 0,
     INSERT,
     DELETE,
-    begin,
-    commit,
+    BEGIN,
+    COMMIT,
     ABORT
 };
+
+
 static std::string LogTypeStr[] = {
     "UPDATE",
     "INSERT",
@@ -41,7 +43,7 @@ public:
     lsn_t lsn_;                /* 当前日志的lsn */
     uint32_t log_tot_len_;     /* 整个日志记录的长度 */
     txn_id_t log_tid_;         /* 创建当前日志的事务ID */
-    lsn_t prev_lsn_;           /* 事务创建的前一条日志记录的lsn，用于undo */
+    lsn_t prev_lsn_;           /* 事务创建的前一条日志记录的lsn*/
 
     // 把日志记录序列化到dest中
     virtual void serialize (char* dest) const {
@@ -71,22 +73,26 @@ public:
     }
 };
 
+
 class BeginLogRecord: public LogRecord {
 public:
     BeginLogRecord() {
-        log_type_ = LogType::begin;
+        log_type_ = LogType::BEGIN;
         lsn_ = INVALID_LSN;
         log_tot_len_ = LOG_HEADER_SIZE;
         log_tid_ = INVALID_TXN_ID;
         prev_lsn_ = INVALID_LSN;
     }
-    BeginLogRecord(txn_id_t txn_id) : BeginLogRecord() {
+
+    BeginLogRecord(txn_id_t txn_id): BeginLogRecord(){
         log_tid_ = txn_id;
     }
+
     // 序列化Begin日志记录到dest中
     void serialize(char* dest) const override {
         LogRecord::serialize(dest);
     }
+
     // 从src中反序列化出一条Begin日志记录
     void deserialize(const char* src) override {
         LogRecord::deserialize(src);   
@@ -103,7 +109,7 @@ public:
 class CommitLogRecord: public LogRecord {
 public:
     CommitLogRecord() {
-        log_type_ = LogType::commit;
+        log_type_ = LogType::COMMIT;
         lsn_ = INVALID_LSN;
         log_tot_len_ = LOG_HEADER_SIZE;
         log_tid_ = INVALID_TXN_ID;
@@ -173,6 +179,7 @@ public:
         prev_lsn_ = INVALID_LSN;
         table_name_ = nullptr;
     }
+
     InsertLogRecord(txn_id_t txn_id, RmRecord& insert_value, Rid& rid, std::string table_name) 
         : InsertLogRecord() {
         log_tid_ = txn_id;
@@ -225,6 +232,7 @@ public:
     Rid rid_;                   // 记录插入的位置
     char* table_name_;          // 插入记录的表名称
     size_t table_name_size_;    // 表名称的大小
+
 };
 
 /**
@@ -403,12 +411,16 @@ public:
     lsn_t add_log_to_buffer(LogRecord* log_record);
     void flush_log_to_disk();
 
-    LogBuffer* get_log_buffer() { return &log_buffer_; }
+    //void write_log_to_disk();
 
 private:    
     std::atomic<lsn_t> global_lsn_{0};  // 全局lsn，递增，用于为每条记录分发lsn
+             
+    lsn_t flushed_to_disk_lsn;          // 记录已经持久化到磁盘中的最后一条日志的日志号(flushed_to_disk_lsn<=global_lsn_)
+    
     std::mutex latch_;                  // 用于对log_buffer_的互斥访问
     LogBuffer log_buffer_;              // 日志缓冲区
-    lsn_t persist_lsn_;                 // 记录已经持久化到磁盘中的最后一条日志的日志号
     DiskManager* disk_manager_;
+    
+    lsn_t prev_lsn_ = 0;
 }; 

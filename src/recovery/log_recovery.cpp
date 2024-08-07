@@ -14,7 +14,7 @@ See the Mulan PSL v2 for more details. */
  * @description: analyze阶段，需要获得脏页表（DPT）和未完成的事务列表（ATT）
  */
 void RecoveryManager::analyze() {
- 
+    
 }
 
 /**

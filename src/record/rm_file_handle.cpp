@@ -60,13 +60,16 @@ Rid RmFileHandle::insert_record(char* buf, Context* context) {
     char* slot_ptr = page_handle.get_slot(slot_no);
     memcpy(slot_ptr, buf, file_hdr_.record_size);
     Bitmap::set(page_handle.bitmap,slot_no);
-    
     // 4. 更新 page handle 中的页头数据结构
     page_handle.page_hdr->num_records++;
     // 5. 如果插入记录后页面已满，更新文件头中的 first_free_page_no
     if (page_handle.page_hdr->num_records >= file_hdr_.num_records_per_page) {
         release_page_handle(page_handle);
     }
+
+    page_handle.page->set_dirty(true);
+    buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), true);
+
     return Rid{page_handle.page->get_page_id().page_no, slot_no};
 }
 
