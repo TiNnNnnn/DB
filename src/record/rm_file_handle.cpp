@@ -129,6 +129,9 @@ void RmFileHandle::delete_record(const Rid& rid, Context* context) {
     Bitmap::reset(page_handle.bitmap, rid.slot_no);
     page_handle.page_hdr->num_records--;
 
+    char* slot = page_handle.get_slot(rid.slot_no);
+    memcpy(slot, 0, file_hdr_.record_size);
+
     // 4. 如果页面在删除记录后变得未满，调用release_page_handle()进行处理
     if (page_handle.page_hdr->num_records < file_hdr_.num_records_per_page) {
         release_page_handle(page_handle);
@@ -158,7 +161,7 @@ void RmFileHandle::update_record(const Rid& rid, char* buf, Context* context) {
     }
     // 3. 更新指定slot位置的数据
     char* slot = page_handle.get_slot(rid.slot_no);
-    memset(slot,0,file_hdr_.record_size);
+    //memset(slot,0,file_hdr_.record_size);
     memcpy(slot, buf, file_hdr_.record_size);
     // 4. 标记页面为脏页
    page_handle.page->set_dirty(true);
