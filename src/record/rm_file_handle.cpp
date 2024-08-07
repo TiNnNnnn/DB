@@ -158,6 +158,7 @@ void RmFileHandle::update_record(const Rid& rid, char* buf, Context* context) {
     }
     // 3. 更新指定slot位置的数据
     char* slot = page_handle.get_slot(rid.slot_no);
+    memset(slot,0,file_hdr_.record_size);
     memcpy(slot, buf, file_hdr_.record_size);
     // 4. 标记页面为脏页
    page_handle.page->set_dirty(true);
