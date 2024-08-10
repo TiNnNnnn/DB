@@ -21,25 +21,28 @@ void RecoveryManager::analyze() {
     lsn_t c_lsn;
    
     memcpy(&c_lsn,buf,sizeof(lsn_t));
-
-    if(c_lsn == -1){
+    if(c_lsn == -1){//checkpoint不存在，从头开始读取logfile
+        c_lsn = 0;
+    }else{
+        //检查当前位置是否为checkpoint_record.
+        int sz  = disk_manager_->read_log(buffer_.buffer_,LOG_HEADER_SIZE,c_lsn);
+        if(sz == -1)
+            throw InternalError("read log error");
+        LogRecord cp_record;
+        cp_record.deserialize(buffer_.buffer_);
+        if(cp_record.log_type_ != LogType::CHECKPOINT){
+            throw InternalError("checkpoint record type error");
+        }
+        buffer_.clear();
+        c_lsn += LOG_HEADER_SIZE;
+    }
+    
+    char l_buf[sizeof(uint32_t)];
+    if(-1 ==disk_manager_->read_log(l_buf,sizeof(uint32_t),c_lsn+OFFSET_LOG_TOT_LEN)){
+        //当前日志为空
         return;
     }
     
-    //检查当前位置是否为checkpoint_record.
-    int sz  = disk_manager_->read_log(buffer_.buffer_,LOG_HEADER_SIZE,c_lsn);
-    if(sz == -1)
-        throw InternalError("read log error");
-    LogRecord cp_record;
-    cp_record.deserialize(buffer_.buffer_);
-    if(cp_record.log_type_ != LogType::CHECKPOINT){
-        throw InternalError("checkpoint record type error");
-    }
-    buffer_.clear();
-    c_lsn += LOG_HEADER_SIZE;
-
-    char l_buf[sizeof(uint32_t)];
-    disk_manager_->read_log(l_buf,sizeof(uint32_t),c_lsn+OFFSET_LOG_TOT_LEN);
     uint32_t rec_tot_len;
     memcpy(&rec_tot_len,&l_buf,sizeof(uint32_t));
 
