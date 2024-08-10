@@ -20,7 +20,7 @@ See the Mulan PSL v2 for more details. */
 lsn_t LogManager::add_log_to_buffer(LogRecord* log_record) {
     std::unique_lock<std::mutex> lock(latch_);
     // 为日志记录分配一个全局唯一的LSN
-    lsn_t lsn = global_lsn_;
+    lsn_t lsn = global_lsn_.load();
    
     log_record->lsn_ = lsn;
     // 序列化日志记录
@@ -36,7 +36,7 @@ lsn_t LogManager::add_log_to_buffer(LogRecord* log_record) {
     log_buffer_.offset_ += log_size;
     
     log_record->prev_lsn_ = prev_lsn_; 
-    global_lsn_+= sizeof(log_data);
+    global_lsn_.fetch_add(log_size);
     prev_lsn_ = lsn;
 
     delete[] log_data;
@@ -51,7 +51,7 @@ void LogManager::flush_log_to_disk() {
     if (log_buffer_.offset_ > 0) {
         disk_manager_->write_log(log_buffer_.buffer_, log_buffer_.offset_);
         // 更新已持久化的LSN
-        flushed_to_disk_lsn = global_lsn_;
+        flushed_to_disk_lsn = global_lsn_.load();
         // 重置缓冲区
         log_buffer_.offset_ = 0;
         memset(log_buffer_.buffer_, 0, sizeof(log_buffer_.buffer_));

@@ -446,8 +446,8 @@ class LogManager {
 public:
     LogManager(DiskManager* disk_manager,BufferPoolManager* buf_mgr) { 
         disk_manager_ = disk_manager;
-        //txn_mgr_ = txn_mgr;
         buf_mgr_ = buf_mgr;
+        global_lsn_.store(0);
     }
     
     lsn_t add_log_to_buffer(LogRecord* log_record);

@@ -109,6 +109,10 @@ void create_static_checkpoint(TransactionManager* txn_mgr_,Context* context){
     memcpy(data, &c_lsn, sizeof(c_lsn));
     context->log_mgr_->get_dm()->write_start_file(data,sizeof(lsn_t));
 
+    //手动提交，不记录日志
+    //context->txn_->set_txn_mode(true);
+
+
     //重置标志位，恢复接受新事务
     txn_mgr_->set_is_checkpointing(false);
 }

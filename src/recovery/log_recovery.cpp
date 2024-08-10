@@ -111,7 +111,9 @@ void RecoveryManager::analyze() {
         }
         buffer_.clear();
         c_lsn+=rec.log_tot_len_;
-        disk_manager_->read_log(l_buf,sizeof(uint32_t),c_lsn+OFFSET_LOG_TOT_LEN);
+        if(-1 == disk_manager_->read_log(l_buf,sizeof(uint32_t),c_lsn+OFFSET_LOG_TOT_LEN)){
+            break;
+        };
         memcpy(&rec_tot_len,&l_buf,sizeof(uint32_t));
     }
 }
