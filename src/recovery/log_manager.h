@@ -24,7 +24,8 @@ enum LogType: int {
     DELETE,
     BEGIN,
     COMMIT,
-    ABORT
+    ABORT,
+    CHECKPOINT,
 };
 
 
@@ -34,7 +35,8 @@ static std::string LogTypeStr[] = {
     "DELETE",
     "BEGIN",
     "COMMIT",
-    "ABORT"
+    "ABORT",
+    "CHECKPOINT"
 };
 
 class LogRecord {
@@ -70,6 +72,32 @@ public:
         printf("log_tot_len: %d\n", log_tot_len_);
         printf("log_tid: %d\n", log_tid_);
         printf("prev_lsn: %d\n", prev_lsn_);
+    }
+};
+
+class CheckPointRecord: public LogRecord {
+public:
+    CheckPointRecord(){
+        log_type_ = LogType::CHECKPOINT;
+        lsn_ = INVALID_LSN;
+        log_tot_len_ = LOG_HEADER_SIZE;
+        log_tid_ = INVALID_TXN_ID;
+        prev_lsn_ = INVALID_LSN;
+    }
+    
+    // 序列化Begin日志记录到dest中
+    void serialize(char* dest) const override {
+        LogRecord::serialize(dest);
+    }
+
+    // 从src中反序列化出一条Begin日志记录
+    void deserialize(const char* src) override {
+        LogRecord::deserialize(src);   
+    }
+
+    virtual void format_print() override {
+        std::cout << "log type in son_function: " << LogTypeStr[log_type_] << "\n";
+        LogRecord::format_print();
     }
 };
 
@@ -232,7 +260,7 @@ public:
     Rid rid_;                   // 记录插入的位置
     char* table_name_;          // 插入记录的表名称
     size_t table_name_size_;    // 表名称的大小
-
+    //std::unordered_set<Page*> page_set_;    // 插入记录时修改的页面
 };
 
 /**
@@ -240,7 +268,7 @@ public:
 */
 class DeleteLogRecord: public LogRecord {
 public:
-    DeleteLogRecord() {
+DeleteLogRecord() {
         log_type_ = LogType::DELETE;
         lsn_ = INVALID_LSN;
         log_tot_len_ = LOG_HEADER_SIZE;
@@ -303,6 +331,7 @@ public:
     Rid rid_;                   // 记录删除的位置
     char* table_name_;          // 删除记录的表名称
     size_t table_name_size_;    // 表名称的大小
+
 };
 
 /**
@@ -382,7 +411,10 @@ public:
     Rid rid_;                   // 记录更新的位置
     char* table_name_;          // 更新记录的表名称
     size_t table_name_size_;    // 表名称的大小
+
 };
+
+
 
 /* 日志缓冲区，只有一个buffer，因此需要阻塞地去把日志写入缓冲区中 */
 
@@ -399,6 +431,12 @@ public:
         return false;
     }
 
+    bool clear() {
+        offset_ = 0; 
+        memset(buffer_, 0, sizeof(buffer_));
+        return true;
+    }
+
     char buffer_[LOG_BUFFER_SIZE+1];
     int offset_;    // 写入log的offset
 };
@@ -406,13 +444,17 @@ public:
 /* 日志管理器，负责把日志写入日志缓冲区，以及把日志缓冲区中的内容写入磁盘中 */
 class LogManager {
 public:
-    LogManager(DiskManager* disk_manager) { disk_manager_ = disk_manager; }
+    LogManager(DiskManager* disk_manager,BufferPoolManager* buf_mgr) { 
+        disk_manager_ = disk_manager;
+        //txn_mgr_ = txn_mgr;
+        buf_mgr_ = buf_mgr;
+    }
     
     lsn_t add_log_to_buffer(LogRecord* log_record);
     void flush_log_to_disk();
 
-    //void write_log_to_disk();
-
+    BufferPoolManager* get_bp(){return buf_mgr_;}
+    DiskManager* get_dm(){return disk_manager_;}
 private:    
     std::atomic<lsn_t> global_lsn_{0};  // 全局lsn，递增，用于为每条记录分发lsn
              
@@ -423,4 +465,7 @@ private:
     DiskManager* disk_manager_;
     
     lsn_t prev_lsn_ = 0;
+
+    //TransactionManager* txn_mgr_;
+    BufferPoolManager* buf_mgr_;
 }; 

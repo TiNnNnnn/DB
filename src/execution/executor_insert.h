@@ -41,7 +41,7 @@ class InsertExecutor : public AbstractExecutor {
 
     std::unique_ptr<RmRecord> Next() override {
         //context_->lock_mgr_->lock_IX_on_table(context_->txn_,fh_->GetFd());
-        bool ret = context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
+        context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
 
         // Make record buffer
         RmRecord rec(fh_->get_file_hdr().record_size);
@@ -79,7 +79,7 @@ class InsertExecutor : public AbstractExecutor {
         context_->txn_->append_write_record(wr);
         
         //加入log_buffer
-        InsertLogRecord *insert_log_record = new InsertLogRecord(context_->txn_->get_transaction_id(),rec,rid_,tab_.name);
+        InsertLogRecord *insert_log_record = new InsertLogRecord(context_->txn_->get_transaction_id(),rec,rid_,tab_name_);
         context_->log_mgr_->add_log_to_buffer(insert_log_record);
 
         // Insert into index
@@ -88,7 +88,7 @@ class InsertExecutor : public AbstractExecutor {
             auto ih = sm_manager_->ihs_.at(sm_manager_->get_ix_manager()->get_index_name(tab_name_, index.cols)).get();
             char* key = new char[index.col_tot_len];
             int offset = 0;
-            for(size_t i = 0; i < index.col_num; ++i) {
+            for(int i = 0; i < index.col_num; ++i) {
                 memcpy(key + offset, rec.data + index.cols[i].offset, index.cols[i].len);
                 offset += index.cols[i].len;
             }

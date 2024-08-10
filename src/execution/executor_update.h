@@ -41,7 +41,7 @@ class UpdateExecutor : public AbstractExecutor {
     
     std::unique_ptr<RmRecord> Next() override {
         //context_->lock_mgr_->lock_IX_on_table(context_->txn_,fh_->GetFd());
-        bool ret = context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
+        context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
       
         for (auto &rid : rids_) {
             // 获取要更新的记录
@@ -100,7 +100,7 @@ class UpdateExecutor : public AbstractExecutor {
             WriteRecord *wr = new WriteRecord (WType::UPDATE_TUPLE,tab_.name,rid,old_rec,*rec);
             context_->txn_->append_write_record(wr);
             //加入log_buffer
-            UpdateLogRecord *update_log_record = new UpdateLogRecord(context_->txn_->get_transaction_id(),old_rec,*rec,rid,tab_.name);
+            UpdateLogRecord *update_log_record = new UpdateLogRecord(context_->txn_->get_transaction_id(),old_rec,*rec,rid,tab_name_);
             context_->log_mgr_->add_log_to_buffer(update_log_record);
 
             // 更新记录到文件

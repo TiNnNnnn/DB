@@ -37,8 +37,7 @@ class SmManager {
     IxManager* ix_manager_;
 
    public:
-    SmManager(DiskManager* disk_manager, BufferPoolManager* buffer_pool_manager, RmManager* rm_manager,
-              IxManager* ix_manager)
+    SmManager(DiskManager* disk_manager, BufferPoolManager* buffer_pool_manager, RmManager* rm_manager,IxManager* ix_manager)
         : disk_manager_(disk_manager),
           buffer_pool_manager_(buffer_pool_manager),
           rm_manager_(rm_manager),

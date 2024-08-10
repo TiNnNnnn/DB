@@ -39,7 +39,7 @@ class DeleteExecutor : public AbstractExecutor {
 
     std::unique_ptr<RmRecord> Next() override {
         //context_->lock_mgr_->lock_IX_on_table(context_->txn_,fh_->GetFd());
-        bool ret = context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
+        context_->lock_mgr_->lock_exclusive_on_table(context_->txn_,fh_->GetFd());
         
         for (auto &rid : rids_) {
             // 获取要删除的记录
@@ -52,7 +52,7 @@ class DeleteExecutor : public AbstractExecutor {
             WriteRecord *wr = new WriteRecord(WType::DELETE_TUPLE,tab_.name,rid,*rec,*rec);
             context_->txn_->append_write_record(wr);
             //加入log_buffer
-            DeleteLogRecord *del_log_record = new  DeleteLogRecord(context_->txn_->get_transaction_id(),*rec,rid,tab_.name);
+            DeleteLogRecord *del_log_record = new  DeleteLogRecord(context_->txn_->get_transaction_id(),*rec,rid,tab_name_);
             context_->log_mgr_->add_log_to_buffer(del_log_record);
 
             // 删除记录
@@ -65,7 +65,7 @@ class DeleteExecutor : public AbstractExecutor {
                 char *key = new char[index.col_tot_len];  // 为索引键分配内存
                 int offset = 0;
                 // 构建索引键值
-                for (size_t j = 0; j < index.col_num; ++j) {
+                for (int j = 0; j < index.col_num; ++j) {
                     memcpy(key + offset, rec->data + index.cols[j].offset, index.cols[j].len);
                     offset += index.cols[j].len;
                 }

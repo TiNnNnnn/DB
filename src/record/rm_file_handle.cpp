@@ -224,7 +224,6 @@ RmPageHandle RmFileHandle::create_new_page_handle() {
 
     // 5. 将文件头写回磁盘
     disk_manager_->write_page(fd_, RM_FILE_HDR_PAGE, reinterpret_cast<char *>(&file_hdr_), sizeof(file_hdr_));
-
     return new_page_handle;
 }
 

@@ -94,12 +94,13 @@ extern int yydebug;
     MAX = 300,
     GROUP = 301,
     HAVING = 302,
-    IDENTIFIER = 303,
-    VALUE_STRING = 304,
-    OP_IN = 305,
-    VALUE_INT = 306,
-    VALUE_FLOAT = 307,
-    VALUE_BOOL = 308
+    STATIC_CHECKPOINT = 303,
+    IDENTIFIER = 304,
+    VALUE_STRING = 305,
+    OP_IN = 306,
+    VALUE_INT = 307,
+    VALUE_FLOAT = 308,
+    VALUE_BOOL = 309
   };
 #endif
 

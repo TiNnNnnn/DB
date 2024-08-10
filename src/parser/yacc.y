@@ -29,6 +29,7 @@ using namespace ast;
 %token COUNT SUM AVG MIN MAX 
 %token GROUP
 %token HAVING
+%token STATIC_CHECKPOINT
 
 // type-specific tokens
 %token <sv_str> IDENTIFIER VALUE_STRING OP_IN  
@@ -37,7 +38,7 @@ using namespace ast;
 %token <sv_bool> VALUE_BOOL
 
 // specify types for non-terminal symbol
-%type <sv_node> stmt dbStmt ddl dml txnStmt setStmt
+%type <sv_node> stmt dbStmt ddl dml txnStmt setStmt static_checkpoint
 %type <sv_field> field
 %type <sv_fields> fieldList
 %type <sv_type_len> type
@@ -94,7 +95,14 @@ stmt:
     | dml
     | txnStmt
     | setStmt
+    | static_checkpoint
     ;
+
+static_checkpoint:
+        CREATE STATIC_CHECKPOINT
+    {
+        $$ = std::make_shared<StaticCheckpoint>();
+    }
 
 txnStmt:
         TXN_BEGIN

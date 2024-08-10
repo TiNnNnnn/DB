@@ -70,9 +70,17 @@ class DiskManager {
 
     void write_log(char *log_data, int size);
 
+    int read_start_file(char *data,int size,int offset);
+
+    void write_start_file(char *data,int size);
+
     void SetLogFd(int log_fd) { log_fd_ = log_fd; }
 
     int GetLogFd() { return log_fd_; }
+
+    void SetStartFd(int fd){start_fd_ = fd;}
+
+    int GetStartFd() {return start_fd_;}
 
     /**
      * @description: 设置文件已经分配的页面个数
@@ -97,4 +105,7 @@ class DiskManager {
 
     int log_fd_ = -1;                             // WAL日志文件的文件句柄，默认为-1，代表未打开日志文件
     std::atomic<page_id_t> fd2pageno_[MAX_FD]{};  // 文件中已经分配的页面个数，初始值为0
+
+    int start_fd_ = -1;
+
 };

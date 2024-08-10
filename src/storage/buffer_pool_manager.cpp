@@ -317,6 +317,17 @@ void BufferPoolManager::flush_all_pages(int fd) {
     }
 }
 
+
+ void BufferPoolManager::flush_all_pages(){
+    std::lock_guard<std::mutex> guard(latch_);
+    for(auto& fid :flush_list_){
+        Page* page = &pages_[fid];
+        del_from_flush_list(page);
+        disk_manager_->write_page(page->get_page_id().fd, page->id_.page_no, page->data_, PAGE_SIZE);
+        page->is_dirty_ = false; // 更新页面的脏状态
+    }
+ }
+
 void BufferPoolManager::delete_all_page(int fd){
     std::lock_guard<std::mutex>guard(latch_);
 

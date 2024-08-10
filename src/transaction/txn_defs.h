@@ -90,7 +90,7 @@ public:
 
     // 表级锁构造函数
     LockDataId(int fd, LockDataType type)
-        : fd_(fd), type_(type), rid_({-1, -1}), lock_type_(RecordLockType::NONE) {
+        : fd_(fd), rid_({-1, -1}), type_(type) ,lock_type_(RecordLockType::NONE) {
         assert(type == LockDataType::TABLE);
     }
 

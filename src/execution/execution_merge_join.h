@@ -72,7 +72,7 @@ public:
             captions.push_back(col.name);
         }
         sort_out_file << "|";
-        for(int i = 0; i < captions.size(); ++i) {
+        for(size_t i = 0; i < captions.size(); ++i) {
             sort_out_file << " " << captions[i] << " |";
         }
         sort_out_file << "\n";
@@ -108,7 +108,7 @@ public:
                     columns.push_back(col_str);
             }
             sort_out_file << "|";
-            for(int i = 0; i < columns.size(); ++i) {
+            for(size_t i = 0; i < columns.size(); ++i) {
                 sort_out_file << " " << columns[i] << " |";
             }
             sort_out_file << "\n";

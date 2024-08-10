@@ -47,6 +47,7 @@ using timestamp_t = int32_t;  // timestamp type, used for transaction concurrenc
 
 // log file
 static const std::string LOG_FILE_NAME = "db.log";
+static const std::string START_FILE_NAME = "start_file.txt";
 
 // replacer
 static const std::string REPLACER_TYPE = "LRU";

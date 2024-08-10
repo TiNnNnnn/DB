@@ -14,7 +14,7 @@ See the Mulan PSL v2 for more details. */
 #include "system/sm_manager.h"
 
 std::unordered_map<txn_id_t, Transaction *> TransactionManager::txn_map = {};
-
+std::unordered_set<Transaction*>TransactionManager::att = {};
 /**
  * @description: 事务的开始方法
  * @return {Transaction*} 开始事务的指针
@@ -27,17 +27,23 @@ Transaction * TransactionManager::begin(Transaction* txn, LogManager* log_manage
     // 2. 如果为空指针，创建新事务
     // 3. 把开始事务加入到全局事务表中
     // 4. 返回当前事务指针
+
+    std::unique_lock<std::mutex> lock(latch_);
+    cv_.wait(lock,[this]{
+            return is_checkpoiting_ == false;
+    });
     
     if (txn == nullptr) {
         txn_id_t txn_id = next_txn_id_++;
         txn = new Transaction(txn_id);
         txn->set_start_ts(txn_id);
     }
-    {
-        //把事务加入到全局事务表中
-        std::unique_lock<std::mutex> lock(latch_);
-        txn_map[txn->get_transaction_id()] = txn;
-    }
+    
+    //把事务加入到全局事务表中
+    //std::unique_lock<std::mutex> lock(latch_);
+    txn_map[txn->get_transaction_id()] = txn;
+    att.insert(txn);
+    
     txn->set_state(TransactionState::GROWING);
     //将begin_log写入log_buffer
     BeginLogRecord begin_log(txn->get_transaction_id());
@@ -75,6 +81,7 @@ void TransactionManager::commit(Transaction* txn, LogManager* log_manager) {
     log_manager->flush_log_to_disk();
 
     txn->set_state(TransactionState::COMMITTED);
+    att.erase(txn);
     // {
     //     std::unique_lock<std::mutex> lock(latch_);
     //     txn_map.erase(txn->get_transaction_id());
@@ -180,6 +187,7 @@ void TransactionManager::abort(Transaction * txn, LogManager *log_manager) {
     log_manager->flush_log_to_disk();
     // 5. 更新事务状态
     txn->set_state(TransactionState::ABORTED);
+    att.erase(txn);
     // 从全局事务表中移除该事务
     // {
     //     std::unique_lock<std::mutex> lock(latch_);

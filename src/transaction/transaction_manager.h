@@ -61,8 +61,18 @@ public:
 
         return res;
     }
-    static std::unordered_map<txn_id_t, Transaction *> txn_map;     // 全局事务表，存放事务ID与事务对象的映射关系
 
+    void set_is_checkpointing(bool b){
+        is_checkpoiting_.store(b);
+        cv_.notify_all();
+    }
+
+    bool get_is_checkpointing(){
+        return is_checkpoiting_.load();
+    }
+
+    static std::unordered_map<txn_id_t, Transaction *> txn_map;     // 全局事务表，存放事务ID与事务对象的映射关系
+    static std::unordered_set<Transaction*> att; //全局活跃事务表
 private:
     ConcurrencyMode concurrency_mode_;      // 事务使用的并发控制算法，目前只需要考虑2PL
     std::atomic<txn_id_t> next_txn_id_{0};  // 用于分发事务ID
@@ -70,4 +80,8 @@ private:
     std::mutex latch_;  // 用于txn_map的并发
     SmManager *sm_manager_;
     LockManager *lock_manager_;
+
+    std::condition_variable cv_;
+    //标志位，为true时表示正在create static_checkpoint
+    std::atomic<bool>is_checkpoiting_{false};
 };

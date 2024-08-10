@@ -44,8 +44,8 @@ auto txn_manager = std::make_unique<TransactionManager>(lock_manager.get(), sm_m
 auto planner = std::make_unique<Planner>(sm_manager.get());
 auto optimizer = std::make_unique<Optimizer>(sm_manager.get(), planner.get());
 auto ql_manager = std::make_unique<QlManager>(sm_manager.get(), txn_manager.get(),planner.get());
-auto log_manager = std::make_unique<LogManager>(disk_manager.get());
-auto recovery = std::make_unique<RecoveryManager>(disk_manager.get(), buffer_pool_manager.get(), sm_manager.get());
+auto log_manager = std::make_unique<LogManager>(disk_manager.get(),buffer_pool_manager.get());
+auto recovery = std::make_unique<RecoveryManager>(disk_manager.get(), buffer_pool_manager.get());
 auto portal = std::make_unique<Portal>(sm_manager.get());
 auto analyze = std::make_unique<Analyze>(sm_manager.get());
 pthread_mutex_t *buffer_mutex;
@@ -120,7 +120,7 @@ void *client_handler(void *sock_fd) {
         offset = 0;
 
         // 开启事务，初始化系统所需的上下文信息（包括事务对象指针、锁管理器指针、日志管理器指针、存放结果的buffer、记录结果长度的变量）
-        Context *context = new Context(lock_manager.get(), log_manager.get(), nullptr, data_send, &offset);
+        Context *context = new Context(lock_manager.get(), log_manager.get(), nullptr, recovery.get(),data_send, &offset);
         SetTransaction(&txn_id, context);
 
         // 用于判断是否已经调用了yy_delete_buffer来删除buf
@@ -204,7 +204,6 @@ void *client_handler(void *sock_fd) {
             break;
         }
         
-        //06_02 TODO: fix txn 
         //如果是单条语句，需要按照一个完整的事务来执行，所以执行完当前语句后，自动提交事务
         if(context->txn_->get_txn_mode() == false)
         {
@@ -289,6 +288,22 @@ void start_server() {
     std::cout << "Server shuts down." << std::endl;
 }
 
+/*重建索引*/
+void rebuild_index(DiskManager* disk_manager_,SmManager* sm_manager_,std::set<int>tb_set_) {
+    for(auto s : tb_set_){
+        std::string name = disk_manager_->get_file_name(s);
+        auto tab_meta = sm_manager_->db_.get_table(name);
+        
+        for(auto idx : tab_meta.indexes){
+            sm_manager_->drop_index(name,tab_meta.cols,nullptr);
+            std::vector<std::string>cols;
+            for(auto c : tab_meta.cols) cols.push_back(c.name);
+            sm_manager_->create_index(name,cols,nullptr);
+        }
+    }
+
+}
+
 int main(int argc, char **argv) {
     if (argc != 2) {
         // 需要指定数据库名称
@@ -322,10 +337,19 @@ int main(int argc, char **argv) {
         sm_manager->open_db(db_name);
 
         // recovery database
+        if (chdir(db_name.c_str()) < 0) {  // 进入名为db_name的目录
+            throw UnixError();
+        }
+        
         recovery->analyze();
         recovery->redo();
         recovery->undo();
-        
+
+        if (chdir("..") < 0) {
+            throw UnixError();
+        }
+        rebuild_index(disk_manager.get(),sm_manager.get(),recovery->get_tb_set());
+
         // 开启服务端，开始接受客户端连接
         start_server();
     } catch (RMDBError &e) {

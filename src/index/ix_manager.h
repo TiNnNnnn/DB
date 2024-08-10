@@ -169,6 +169,7 @@ class IxManager {
         for(int i=0;i<ih->file_hdr_->num_pages_+1;i++){
             buffer_pool_manager_->delete_page({ih->fd_,i});
         }
+        
         // 缓冲区的所有页刷到磁盘，注意这句话必须写在close_file前面
         buffer_pool_manager_->delete_all_page(ih->fd_);
         buffer_pool_manager_->flush_all_pages(ih->fd_);

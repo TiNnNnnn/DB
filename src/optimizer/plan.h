@@ -46,6 +46,7 @@ typedef enum PlanTag{
     T_Projection,
     T_GroupBy,
     T_Aggregate,
+    T_Create_static_checkpoint,
 } PlanTag;
 
 // 查询执行计划

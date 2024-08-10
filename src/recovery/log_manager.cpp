@@ -10,6 +10,7 @@ See the Mulan PSL v2 for more details. */
 
 #include <cstring>
 #include "log_manager.h"
+#include "transaction/transaction_manager.h"
 
 /**
  * @description: 添加日志记录到日志缓冲区中，并返回日志记录号
@@ -56,3 +57,5 @@ void LogManager::flush_log_to_disk() {
         memset(log_buffer_.buffer_, 0, sizeof(log_buffer_.buffer_));
     }
 }
+
+

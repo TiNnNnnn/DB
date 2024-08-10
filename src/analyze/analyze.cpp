@@ -347,13 +347,10 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 auto analyze = std::make_unique<Analyze>(sm_manager_);
                 auto planner = std::make_unique<Planner>(sm_manager_);
                 auto optimizer = std::make_unique<Optimizer>(sm_manager_, planner.get());
-                auto lock_manager = std::make_unique<LockManager>();
-                auto txn_manager = std::make_unique<TransactionManager>(lock_manager.get(), sm_manager_);
-                auto log_manager = std::make_unique<LogManager>(disk_manager.get());
-                auto ql_manager = std::make_unique<QlManager>(sm_manager_, txn_manager.get(),planner.get());
+                auto ql_manager = std::make_unique<QlManager>(sm_manager_, nullptr,planner.get());
                 auto portal = std::make_unique<Portal>(sm_manager_);
                 txn_id_t txn_id = INVALID_TXN_ID;
-                Context *context = new Context(lock_manager.get(), log_manager.get(), nullptr, nullptr, 0);
+                //Context *context = new Context(nullptr, nullptr, nullptr, nullptr, 0);
 
                 // 解析器
                 auto in_query = std::dynamic_pointer_cast<ast::Subquery>(e->rhs);
@@ -385,17 +382,17 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                     }
                 }
                 // 优化器
-                std::shared_ptr<Plan> plan = optimizer->plan_query(query, context);
+                std::shared_ptr<Plan> plan = optimizer->plan_query(query, nullptr);
                 // 执行器
-                std::shared_ptr<PortalStmt> portalStmt = portal->start(plan, context);
-                auto ret = portal->run(portalStmt, ql_manager.get(), &txn_id, context,true);
+                std::shared_ptr<PortalStmt> portalStmt = portal->start(plan, nullptr);
+                auto ret = portal->run(portalStmt, ql_manager.get(), &txn_id, nullptr,true);
                 portal->drop();
 
                 cond.is_lhs_col = true;
                 cond.is_rhs_val = false; //no_used
                 cond.op = CompOp::IN;
                             
-                for(int i=0;i<ret.size();i++){
+                for(size_t i=0;i<ret.size();i++){
                     std::string r_str = ret[i][0];
                     Value r_val;
                     if(l_col_meta.type == TYPE_INT){
@@ -438,13 +435,10 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                 auto analyze = std::make_unique<Analyze>(sm_manager_);
                 auto planner = std::make_unique<Planner>(sm_manager_);
                 auto optimizer = std::make_unique<Optimizer>(sm_manager_, planner.get());
-                auto lock_manager = std::make_unique<LockManager>();
-                auto txn_manager = std::make_unique<TransactionManager>(lock_manager.get(), sm_manager_);
-                auto log_manager = std::make_unique<LogManager>(disk_manager.get());
-                auto ql_manager = std::make_unique<QlManager>(sm_manager_, txn_manager.get(),planner.get());
+                auto ql_manager = std::make_unique<QlManager>(sm_manager_, nullptr,planner.get());
                 auto portal = std::make_unique<Portal>(sm_manager_);
                 txn_id_t txn_id = INVALID_TXN_ID;
-                Context *context = new Context(lock_manager.get(), log_manager.get(), nullptr, nullptr, 0);
+                //Context *context = new Context(nullptr,nullptr, nullptr, nullptr,nullptr, 0);
 
                 // 解析器
                 std::shared_ptr<Query> query = analyze->do_analyze(sub_query->select_stmt);
@@ -498,10 +492,10 @@ void Analyze::get_clause(const std::vector<std::shared_ptr<ast::BinaryExpr>> &sv
                     }
                 }
                 // 优化器
-                std::shared_ptr<Plan> plan = optimizer->plan_query(query, context);
+                std::shared_ptr<Plan> plan = optimizer->plan_query(query, nullptr);
                 // 执行器
-                std::shared_ptr<PortalStmt> portalStmt = portal->start(plan, context);
-                auto ret = portal->run(portalStmt, ql_manager.get(), &txn_id, context,true);
+                std::shared_ptr<PortalStmt> portalStmt = portal->start(plan, nullptr);
+                auto ret = portal->run(portalStmt, ql_manager.get(), &txn_id, nullptr,true);
                 portal->drop();
                 if( ret.size() != 1){
                     throw InternalError("Scalar Subquery's return value must be single value");

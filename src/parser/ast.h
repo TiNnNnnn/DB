@@ -65,6 +65,10 @@ struct TxnAbort : public TreeNode {
 struct TxnRollback : public TreeNode {
 };
 
+struct StaticCheckpoint : public TreeNode {
+
+};
+
 struct TypeLen : public TreeNode {
     SvType type;
     int len;

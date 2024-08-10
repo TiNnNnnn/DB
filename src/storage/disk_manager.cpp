@@ -310,12 +310,45 @@ int DiskManager::read_log(char *log_data, int size, int offset) {
  */
 void DiskManager::write_log(char *log_data, int size) {
     if (log_fd_ == -1) {
-        log_fd_ = open_file(LOG_FILE_NAME);
+        start_fd_ = get_file_fd(START_FILE_NAME);
+        //log_fd_ = open_file(START_FILE_NAME);
     }
 
     // write from the file_end
     lseek(log_fd_, 0, SEEK_END);
     ssize_t bytes_write = write(log_fd_, log_data, size);
+    if (bytes_write != size) {
+        throw UnixError();
+    }
+}
+
+int DiskManager::read_start_file(char *data,int size,int offset){
+     // read log file from the previous end
+    if (start_fd_ == -1) {
+        //start_fd_ = open_file(LOG_FILE_NAME);
+        start_fd_ = get_file_fd(START_FILE_NAME);
+    }
+    int file_size = get_file_size(START_FILE_NAME);
+    if (offset > file_size) {
+        return -1;
+    }
+
+    size = std::min(size, file_size - offset);
+    if(size == 0) return 0;
+    lseek(start_fd_, offset, SEEK_SET);
+    ssize_t bytes_read = read(start_fd_, data, size);
+    assert(bytes_read == size);
+    return bytes_read;
+}
+
+void DiskManager::write_start_file(char *data,int size){
+    if (start_fd_ == -1) {
+        //start_fd_ = open_file(START_FILE_NAME);
+         start_fd_ = get_file_fd(START_FILE_NAME);
+    }
+    // write from the file_start
+    lseek(start_fd_, 0, SEEK_SET);
+    ssize_t bytes_write = write(start_fd_, data, size);
     if (bytes_write != size) {
         throw UnixError();
     }

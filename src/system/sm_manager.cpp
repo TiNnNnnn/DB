@@ -14,7 +14,6 @@ See the Mulan PSL v2 for more details. */
 #include <unistd.h>
 
 #include <fstream>
-
 #include "index/ix.h"
 #include "record/rm.h"
 #include "record_printer.h"
@@ -55,13 +54,26 @@ void SmManager::create_db(const std::string& db_name) {
 
     // 将new_db中的信息，按照定义好的operator<<操作符，写入到ofs打开的DB_META_NAME文件中
     ofs << *new_db;  // 注意：此处重载了操作符<<
-
     delete new_db;
 
     // 创建日志文件
     disk_manager_->create_file(LOG_FILE_NAME);
-    int log_fd = disk_manager_->open_file(LOG_FILE_NAME);
-    disk_manager_->SetLogFd(log_fd);
+
+    // 创建启动文件
+    disk_manager_->create_file(START_FILE_NAME);
+    int start_fd = disk_manager_->open_file(START_FILE_NAME);
+    disk_manager_->SetStartFd(start_fd);
+    
+    // //第一次启动，checkpoint_lsn = -1
+    //char buf[sizeof(lsn_t)] = {-1};
+    //memcpy(buf,0,sizeof(lsn_t));
+
+    lsn_t value = -1; // 原始值
+    char buf[sizeof(lsn_t)];
+    std::memcpy(buf, &value, sizeof(lsn_t));
+
+    disk_manager_->write_start_file(buf,sizeof(lsn_t));
+    disk_manager_->close_file(start_fd);
 
     // 回到根目录
     if (chdir("..") < 0) {
@@ -102,7 +114,15 @@ void SmManager::open_db(const std::string& db_name) {
     }
     ifs >> db_;  // 使用重载的操作符>>将文件内容读入到db_对象中
     ifs.close();
-    
+
+    //打开日志文件
+    int log_fd = disk_manager_->open_file(LOG_FILE_NAME);
+    disk_manager_->SetLogFd(log_fd);
+
+    //打开启动文件
+    int start_fd = disk_manager_->open_file(START_FILE_NAME);
+    disk_manager_->SetStartFd(start_fd);
+
     // 打开每个表的数据文件和索引文件
     for (auto& tab_entry : db_.tabs_) {
         const std::string& tab_name = tab_entry.first;
@@ -368,7 +388,7 @@ void SmManager::create_index(const std::string& tab_name, const std::vector<std:
         auto rec = file_hdr->get_record(rid,nullptr);
         char* key = new char[idx_meta.col_tot_len];
         int offset = 0;
-        for(size_t i = 0; i < idx_meta.col_num; ++i) {
+        for(int i = 0; i < idx_meta.col_num; ++i) {
             memcpy(key + offset, rec->data + idx_meta.cols[i].offset, idx_meta.cols[i].len);
             offset += idx_meta.cols[i].len;
         }
@@ -433,7 +453,7 @@ void SmManager::drop_index(const std::string& tab_name, const std::vector<std::s
         bool left = index.tab_name == tab_name&&index.col_num == col_num && index.col_tot_len == col_total_size;
         if(!left)return false;
 
-        size_t i = 0;
+        int i = 0;
         for(; i < index.col_num; ++i) {
             if(index.cols[i].name.compare(cols[i].name) != 0)return false;
         }

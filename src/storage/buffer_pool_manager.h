@@ -83,12 +83,16 @@ class BufferPoolManager {
 
     void delete_all_page(int fd);
 
+    void flush_all_pages();
+
    private:
     bool find_victim_page(frame_id_t* frame_id);
 
     void update_page(Page* page, PageId new_page_id, frame_id_t new_frame_id);
 
     bool del_from_flush_list(Page* page);
+
+
 
     void gc();
 };

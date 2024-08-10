@@ -200,7 +200,8 @@ public:
         return "GroupByExecutor";
     }
 
-    Rid &rid() override {}
+    Rid &rid() override {
+    }
 private:
     std::string generate_group_key(const RmRecord &record) {
         // 根据分组列生成分组键
@@ -343,7 +344,7 @@ private:
                     return false;
             }
         }
-        
+        return false;
     }
 
     void update_aggregate_record_for_having(AggregateResult &aggregate_result, const RmRecord &record,const Condition& cond) {
