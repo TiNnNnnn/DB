@@ -89,7 +89,7 @@ page_id_t IxNodeHandle::internal_lookup(const char *key) {
     // 3. 返回页面编号
 
     // 1. 查找当前非叶子节点中目标key所在孩子节点（子树）的位置
-    int idx = lower_bound(key);
+    int idx = upper_bound(key);
     return get_rid(idx -1)->page_no; 
     // if( 0 == memcmp(key,keys + idx* file_hdr->col_tot_len_,file_hdr->col_tot_len_)){
     //     idx++;    
