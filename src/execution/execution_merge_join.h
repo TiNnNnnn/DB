@@ -371,7 +371,7 @@ private:
                 bool is_find = false;
                 auto rhs_vals = cond.rhs_vals;
                 for(auto& rhs_val : rhs_vals){
-                    if (eval_condition(lhs_data, lhs_col_meta->type, CompOp::OP_EQ , rhs_val)) {
+                    if (eval_condition(lhs_data, lhs_col_meta->type,lhs_col_meta->len, CompOp::OP_EQ , rhs_val)) {
                         is_find = true;
                         break;
                     }
@@ -384,7 +384,7 @@ private:
 
             if (cond.is_rhs_val) {
                 // 右边是常量值
-                if (!eval_condition(lhs_data, lhs_col_meta->type, cond.op, cond.rhs_val)) {
+                if (!eval_condition(lhs_data, lhs_col_meta->type, lhs_col_meta->len,cond.op, cond.rhs_val)) {
                     return false;
                 }
             } else {
@@ -400,14 +400,14 @@ private:
     }
 
      // 评估条件（左值 vs 右值）
-    bool eval_condition(const char *lhs_data, ColType lhs_type, CompOp op, const Value &rhs_val) {
+    bool eval_condition(const char *lhs_data, ColType lhs_type,int lhs_len, CompOp op, const Value &rhs_val) {
         switch (lhs_type) {
             case TYPE_INT:
                 return eval_condition(*(int *)lhs_data, op, rhs_val.int_val);
             case TYPE_FLOAT:
                 return eval_condition(*(float *)lhs_data, op, rhs_val.float_val);
             case TYPE_STRING:
-                return eval_condition(std::string(lhs_data, rhs_val.str_val.size()), op, rhs_val.str_val);
+                return eval_condition(std::string(lhs_data, lhs_len), op, rhs_val.str_val);
             default:
                 return false;
         }
