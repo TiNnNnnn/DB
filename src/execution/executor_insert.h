@@ -79,7 +79,7 @@ class InsertExecutor : public AbstractExecutor {
         context_->txn_->append_write_record(wr);
         
         //加入log_buffer
-        InsertLogRecord *insert_log_record = new InsertLogRecord(context_->txn_->get_transaction_id(),rec,rid_,tab_name_);
+        InsertLogRecord *insert_log_record = new InsertLogRecord(context_->txn_->get_transaction_id(),rec,rid_,tab_.name);
         context_->log_mgr_->add_log_to_buffer(insert_log_record);
 
         // Insert into index

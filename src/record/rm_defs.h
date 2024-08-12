@@ -40,7 +40,7 @@ struct RmRecord {
     bool allocated_ = false;    // 是否已经为数据分配空间
 
     RmRecord() = default;
-
+public:
     RmRecord(const RmRecord& other) {
         size = other.size;
         data = new char[size];
@@ -71,6 +71,31 @@ struct RmRecord {
 
     void SetData(char* data_) {
         memcpy(data, data_, size);
+    }
+
+    int getSize(){
+        return sizeof(int) + size + sizeof(bool);
+    }
+
+    int serialize(char* dest){
+        int offset = 0;
+        memcpy(dest+offset,&size,sizeof(int));
+        offset+=sizeof(int);
+        memcpy(dest+offset,data,size);
+        offset+=size;
+        memcpy(dest+offset,&allocated_,sizeof(bool));
+        return offset + sizeof(bool);
+    }
+
+    int desrialize(const char* src){
+        int offset = 0;
+        memcpy(&size,src+offset,sizeof(int));
+        offset+=sizeof(int);
+        data = new char[size];
+        memcpy(data,src+offset,size);
+        offset+=size;
+        memcpy(&allocated_,src+offset,sizeof(bool));
+        return offset + sizeof(bool);
     }
 
     void Deserialize(const char* data_) {

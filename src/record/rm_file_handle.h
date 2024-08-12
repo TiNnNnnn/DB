@@ -52,6 +52,7 @@ class RmFileHandle {
     RmFileHdr file_hdr_;    // 文件头，维护当前表文件的元数据
 
    public:
+    RmFileHandle(){}
     RmFileHandle(DiskManager *disk_manager, BufferPoolManager *buffer_pool_manager, int fd)
         : disk_manager_(disk_manager), buffer_pool_manager_(buffer_pool_manager), fd_(fd) {
         // 注意：这里从磁盘中读出文件描述符为fd的文件的file_hdr，读到内存中
@@ -61,6 +62,8 @@ class RmFileHandle {
         // disk_manager管理的fd对应的文件中，设置从file_hdr_.num_pages开始分配page_no
         disk_manager_->set_fd2pageno(fd, file_hdr_.num_pages);
     }
+
+    
 
     RmFileHdr get_file_hdr() { return file_hdr_; }
     int GetFd() { return fd_; }
@@ -80,6 +83,12 @@ class RmFileHandle {
     void delete_record(const Rid &rid, Context *context);
 
     void update_record(const Rid &rid, char *buf, Context *context);
+
+    void insert_record_for_recovery(const Rid& rid, char* buf);
+
+    void delete_record_for_recovery(const Rid &rid, Context *context);
+
+    void update_record_for_recovery(const Rid &rid, char *buf, Context *context);
 
     RmPageHandle create_new_page_handle();
 

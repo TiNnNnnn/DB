@@ -69,7 +69,6 @@ class RmManager {
      * @return {unique_ptr<RmFileHandle>} 文件句柄的指针
      */
     std::unique_ptr<RmFileHandle> open_file(const std::string& filename) {
-        
         int fd = disk_manager_->open_file(filename);
         return std::make_unique<RmFileHandle>(disk_manager_, buffer_pool_manager_, fd);
     }

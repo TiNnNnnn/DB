@@ -53,7 +53,7 @@ void BufferPoolManager::update_page(Page *page, PageId new_page_id, frame_id_t n
     std::lock_guard<std::mutex> guard(latch_);
     if (page->is_dirty()){
         //write dirty page back to disk
-        del_from_flush_list(page);
+        //del_from_flush_list(page);
         disk_manager_->write_page(page->id_.fd,page->id_.page_no,page->data_,PAGE_SIZE);
     }
     page_table_.erase(page->id_);
@@ -67,14 +67,14 @@ void BufferPoolManager::update_page(Page *page, PageId new_page_id, frame_id_t n
 /**
     @description: 将脏页从flush_list中删除（脏页需要flush到磁盘前调用）
 **/
-bool BufferPoolManager::del_from_flush_list(Page* page){
-    frame_id_t frame_id = page_table_[page->id_];
-    auto iter = std::find(flush_list_.begin(),flush_list_.end(),frame_id);
-    if(iter == flush_list_.end())
-        throw InternalError("dirty page not in flush page!");
-    flush_list_.erase(iter);
-    return true;
-}
+// bool BufferPoolManager::del_from_flush_list(Page* page){
+//     frame_id_t frame_id = page_table_[page->id_];
+//     auto iter = std::find(flush_list_.begin(),flush_list_.end(),frame_id);
+//     if(iter == flush_list_.end())
+//         throw InternalError("dirty page not in flush page!");
+//     flush_list_.erase(iter);
+//     return true;
+// }
 
 /**
  * @description: 从buffer pool获取需要的页。
@@ -112,7 +112,7 @@ Page* BufferPoolManager::fetch_page(PageId page_id) {
         Page *page = &pages_[frame_id];
         // 2. 若获得的可用 frame 存储的为 dirty page，则调用 updata_page 将 page 写回到磁盘
         if (page->is_dirty_) {
-            del_from_flush_list(page);
+            //del_from_flush_list(page);
             disk_manager_->write_page(page->id_.fd, page->id_.page_no, page->data_, PAGE_SIZE);
         }
         page_table_.erase(page->id_);
@@ -172,10 +172,10 @@ bool BufferPoolManager::unpin_page(PageId page_id, bool is_dirty) {
         page->is_dirty_ = true;
         //将脏页加入到flush_list (在flush_list不一定在lru_list中，原因在于只有在没有线程使用
         //page时才能够加入lru_list)
-        auto iter = std::find(flush_list_.begin(),flush_list_.end(),frame_id);
+        //auto iter = std::find(flush_list_.begin(),flush_list_.end(),frame_id);
         //如果脏页已经存在于flush_list中，不需要重复插入
-        if(iter != flush_list_.end())
-            flush_list_.push_front(frame_id);
+        // if(iter == flush_list_.end())
+        //      flush_list_.push_front(frame_id);
     }
     return true;
 }
@@ -204,7 +204,7 @@ bool BufferPoolManager::flush_page(PageId page_id) {
     frame_id_t frame_id = it->second;
     Page *page = &pages_[frame_id];
     // 2. 将页面写回磁盘
-    del_from_flush_list(page);
+    //del_from_flush_list(page);
     disk_manager_->write_page(page_id.fd, page_id.page_no, page->data_, PAGE_SIZE);
     // 3. 更新页面的is_dirty状态
     page->is_dirty_ = false;
@@ -235,7 +235,7 @@ Page* BufferPoolManager::new_page(PageId* page_id,int pno) {
     else page_id->page_no = pno;
     // 3. 将frame的数据写回磁盘（如果frame是脏页）
     if (page->is_dirty_) {
-        del_from_flush_list(page);
+        //del_from_flush_list(page);
         disk_manager_->write_page(page->id_.fd, page->id_.page_no, page->data_, PAGE_SIZE);
     }
 
@@ -278,7 +278,7 @@ bool BufferPoolManager::delete_page(PageId page_id) {
     }
     // 3. 将目标页数据写回磁盘
     if (page->is_dirty_) {
-        del_from_flush_list(page);
+        //del_from_flush_list(page);
         disk_manager_->write_page(page_id.fd, page_id.page_no, page->data_, PAGE_SIZE);
     }
     // 4. 从页表中删除目标页
@@ -309,7 +309,7 @@ void BufferPoolManager::flush_all_pages(int fd) {
 
             // 如果页面是脏页，则将其写回磁盘
             if (page->is_dirty_) {
-                del_from_flush_list(page);
+                //del_from_flush_list(page);
                 disk_manager_->write_page(fd, page->id_.page_no, page->data_, PAGE_SIZE);
                 page->is_dirty_ = false; // 更新页面的脏状态
             }
@@ -320,12 +320,18 @@ void BufferPoolManager::flush_all_pages(int fd) {
 
  void BufferPoolManager::flush_all_pages(){
     std::lock_guard<std::mutex> guard(latch_);
-    for(auto& fid :flush_list_){
-        Page* page = &pages_[fid];
-        del_from_flush_list(page);
+    for(auto &entry : page_table_){
+        Page *page = &pages_[entry.second];
         disk_manager_->write_page(page->get_page_id().fd, page->id_.page_no, page->data_, PAGE_SIZE);
         page->is_dirty_ = false; // 更新页面的脏状态
     }
+    // for(auto& fid :flush_list_){
+    //     Page* page = &pages_[fid];
+    //     //del_from_flush_list(page);
+    //     disk_manager_->write_page(page->get_page_id().fd, page->id_.page_no, page->data_, PAGE_SIZE);
+    //     page->is_dirty_ = false; // 更新页面的脏状态
+    // }
+    // flush_list_.clear();
  }
 
 void BufferPoolManager::delete_all_page(int fd){

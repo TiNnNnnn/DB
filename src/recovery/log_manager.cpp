@@ -39,6 +39,19 @@ lsn_t LogManager::add_log_to_buffer(LogRecord* log_record) {
     global_lsn_.fetch_add(log_size);
     prev_lsn_ = lsn;
 
+    //持久化global_lsn到 log file header中
+    int hdr_sz = LOG_HEADER_SIZE+sizeof(lsn_t)*2+sizeof(size_t);
+    char buf[hdr_sz];
+    disk_manager_->read_log_header(buf,hdr_sz);
+    HeaderRecord h_rec;
+    h_rec.deserialize(buf);
+    if(h_rec.log_type_ != LogType::HEADER){
+        throw InternalError("log typw is not logheader");
+    }
+    h_rec.global_lsn_ = global_lsn_.load();
+    h_rec.serialize(buf);
+    disk_manager_->write_log_header(buf,hdr_sz);
+
     delete[] log_data;
     return lsn;
 }

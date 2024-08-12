@@ -66,18 +66,22 @@ void RecoveryManager::analyze() {
                             //事务已经提交，将涉及的页面从undo_list中删除
                             for(auto &dp :undo_list_){
                                 auto& logs = dp.second.undo_logs_;
-                                std::remove_if(logs.begin(),logs.end(),[&](const std::pair<lsn_t, txn_id_t>& p){
-                                        return rec.log_tid_ == p.second;
-                                });
+                                for (auto it = logs.begin(); it != logs.end(); ) {
+                                    if (it->second == rec.log_tid_) {
+                                        it = logs.erase(it);
+                                    } else {
+                                        ++it;
+                                    }
+                                }
                             }
                         }
                         break;
                 case LogType::UPDATE:
-                        
                         ur.deserialize(buffer_.buffer_);
                         //将数据修改操作记录
                         if(att_.count(rec.log_tid_)){
-                                int fd = disk_manager_->get_file_fd(std::string(ur.table_name_));
+                                std::string name = std::string(ur.table_name_,ur.table_name_size_);
+                                int fd = disk_manager_->get_file_fd(name);
                                 PageId pid(fd,ur.rid_.page_no);
                                 redo_list_[pid].redo_logs_.push_back(std::make_pair(ur.lsn_,ur.log_tid_));
                                 undo_list_[pid].undo_logs_.push_back(std::make_pair(ur.lsn_,ur.log_tid_));  
@@ -85,10 +89,10 @@ void RecoveryManager::analyze() {
                         }
                         break;
                 case LogType::INSERT:
-                        
                         ir.deserialize(buffer_.buffer_);
                         if(att_.count(rec.log_tid_)){
-                                int fd = disk_manager_->get_file_fd(std::string(ur.table_name_));
+                                std::string name = std::string(ir.table_name_,ir.table_name_size_);
+                                int fd = disk_manager_->get_file_fd(name);
                                 PageId pid(fd,ir.rid_.page_no);
                                 redo_list_[pid].redo_logs_.push_back(std::make_pair(ir.lsn_,ir.log_tid_));
                                 undo_list_[pid].undo_logs_.push_back(std::make_pair(ir.lsn_,ir.log_tid_));
@@ -96,21 +100,25 @@ void RecoveryManager::analyze() {
                         }
                         break;
                 case LogType::DELETE:
-                        
                         dr.deserialize(buffer_.buffer_);
                         if(att_.count(rec.log_tid_)){
-                                int fd = disk_manager_->get_file_fd(std::string(ur.table_name_));
+                                std::string name = std::string(dr.table_name_,dr.table_name_size_);
+                                int fd = disk_manager_->get_file_fd(name);
                                 PageId pid(fd,dr.rid_.page_no);
                                 redo_list_[pid].redo_logs_.push_back(std::make_pair(dr.lsn_,dr.log_tid_));
                                 undo_list_[pid].undo_logs_.push_back(std::make_pair(dr.lsn_,dr.log_tid_));
                                 tb_set_.insert(fd);
                         }
                         break;
+                case LogType::HEADER:
+                        break;
                 default:
                         throw InternalError("error log_record type");
         }
         buffer_.clear();
         c_lsn+=rec.log_tot_len_;
+
+        //读取下一条log_record的长度
         if(-1 == disk_manager_->read_log(l_buf,sizeof(uint32_t),c_lsn+OFFSET_LOG_TOT_LEN)){
             break;
         };
@@ -124,16 +132,15 @@ void RecoveryManager::analyze() {
 void RecoveryManager::redo() {
     for(const auto& dp : redo_list_){
         auto& redo_lsns = dp.second.redo_logs_;
-        auto rm_file_hdr = new RmFileHandle(disk_manager_,buffer_pool_manager_,dp.first.fd);
         
+        auto rm_file_hdr = new RmFileHandle(disk_manager_,buffer_pool_manager_,dp.first.fd);
         //顺序执行日志修改每个数据页
-        for(auto redo_lsn : redo_lsns){
-            
+        for(auto& redo_lsn : redo_lsns){
             lsn_t lsn = redo_lsn.first;
             char l_buf[LOG_HEADER_SIZE];
             disk_manager_->read_log(l_buf,LOG_HEADER_SIZE,lsn);
             LogRecord rec;
-            rec.deserialize(buffer_.buffer_);
+            rec.deserialize(l_buf);
             
             char record_buf[rec.log_tot_len_];
             disk_manager_->read_log(record_buf,rec.log_tot_len_,lsn);
@@ -141,17 +148,20 @@ void RecoveryManager::redo() {
             if(rec.log_type_ == LogType::INSERT){
                 InsertLogRecord ir;
                 ir.deserialize(record_buf);
-                rm_file_hdr->insert_record(ir.rid_,ir.insert_value_.data);
+                std::cout<<"redo insert ["<<ir.rid_.page_no<<","<<ir.rid_.slot_no<<"],"<<std::string(ir.insert_value_.data,ir.insert_value_.size)<<std::endl;
+                rm_file_hdr->insert_record_for_recovery(ir.rid_,ir.insert_value_.data);
 
             }else if(rec.log_type_ == LogType::UPDATE){
                 UpdateLogRecord ur;
                 ur.deserialize(record_buf);
-                rm_file_hdr->update_record(ur.rid_,ur.new_value_.data,nullptr);
+                std::cout<<"redo update ["<<ur.rid_.page_no<<","<<ur.rid_.slot_no<<"],"<<std::string(ur.new_value_.data,ur.new_value_.size)<<std::endl;
+                rm_file_hdr->update_record_for_recovery(ur.rid_,ur.new_value_.data,nullptr);
 
             }else if(rec.log_type_ == LogType::DELETE){
                 DeleteLogRecord dr;
                 dr.deserialize(record_buf);
-                rm_file_hdr->delete_record(dr.rid_,nullptr);
+                std::cout<<"redo delete ["<<dr.rid_.page_no<<","<<dr.rid_.slot_no<<"],"<<std::string(dr.delete_value_.data,dr.delete_value_.size)<<std::endl;
+                rm_file_hdr->delete_record_for_recovery(dr.rid_,nullptr);
             }
         }
     }
@@ -164,14 +174,13 @@ void RecoveryManager::undo() {
     for(const auto& up : undo_list_ ){
         auto& undo_lsns = up.second.undo_logs_;
         auto rm_file_hdr = new RmFileHandle(disk_manager_,buffer_pool_manager_,up.first.fd);
-
         //逆序执行日志回滚每个数据页
         for(auto undo_lsn = undo_lsns.rbegin(); undo_lsn != undo_lsns.rend(); ++undo_lsn){
             lsn_t lsn = undo_lsn->first;
             char l_buf[LOG_HEADER_SIZE];
             disk_manager_->read_log(l_buf,LOG_HEADER_SIZE,lsn);
             LogRecord rec;
-            rec.deserialize(buffer_.buffer_);
+            rec.deserialize(l_buf);
             
             char record_buf[rec.log_tot_len_];
             disk_manager_->read_log(record_buf,rec.log_tot_len_,lsn);
@@ -179,17 +188,20 @@ void RecoveryManager::undo() {
             if(rec.log_type_ == LogType::INSERT){
                 InsertLogRecord ir;
                 ir.deserialize(record_buf);
-                rm_file_hdr->delete_record(ir.rid_,nullptr);
+                std::cout<<"undo insert rollback ["<<ir.rid_.page_no<<","<<ir.rid_.slot_no<<"],"<<std::string(ir.insert_value_.data,ir.insert_value_.size)<<std::endl;
+                rm_file_hdr->delete_record_for_recovery(ir.rid_,nullptr);
 
             }else if(rec.log_type_ == LogType::UPDATE){
                 UpdateLogRecord ur;
                 ur.deserialize(record_buf);
-                rm_file_hdr->update_record(ur.rid_,ur.old_value_.data,nullptr);
+                std::cout<<"undo update rollback ["<<ur.rid_.page_no<<","<<ur.rid_.slot_no<<"],"<<std::string(ur.old_value_.data,ur.old_value_.size)<<std::endl;
+                rm_file_hdr->update_record_for_recovery(ur.rid_,ur.old_value_.data,nullptr);
 
             }else if(rec.log_type_ == LogType::DELETE){
                 DeleteLogRecord dr;
                 dr.deserialize(record_buf);
-                rm_file_hdr->insert_record(dr.rid_,dr.delete_value_.data);
+                std::cout<<"undo delete rollback ["<<dr.rid_.page_no<<","<<dr.rid_.slot_no<<"],"<<std::string(dr.delete_value_.data,dr.delete_value_.size)<<std::endl;
+                rm_file_hdr->insert_record_for_recovery(dr.rid_,dr.delete_value_.data);
             }
         }
     }

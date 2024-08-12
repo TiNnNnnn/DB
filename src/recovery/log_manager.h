@@ -26,6 +26,7 @@ enum LogType: int {
     COMMIT,
     ABORT,
     CHECKPOINT,
+    HEADER,
 };
 
 
@@ -37,6 +38,7 @@ static std::string LogTypeStr[] = {
     "COMMIT",
     "ABORT",
     "CHECKPOINT"
+    "HEADER"
 };
 
 class LogRecord {
@@ -48,7 +50,7 @@ public:
     lsn_t prev_lsn_;           /* 事务创建的前一条日志记录的lsn*/
 
     // 把日志记录序列化到dest中
-    virtual void serialize (char* dest) const {
+    virtual void serialize (char* dest){
         memcpy(dest + OFFSET_LOG_TYPE, &log_type_, sizeof(LogType));
         memcpy(dest + OFFSET_LSN, &lsn_, sizeof(lsn_t));
         memcpy(dest + OFFSET_LOG_TOT_LEN, &log_tot_len_, sizeof(uint32_t));
@@ -75,6 +77,55 @@ public:
     }
 };
 
+//log file header info (for recovery)
+class HeaderRecord: public LogRecord {
+public:
+    HeaderRecord(){
+        log_type_ = LogType::HEADER;
+        lsn_ = INVALID_LSN;
+        log_tot_len_ = LOG_HEADER_SIZE;
+        log_tid_ = INVALID_TXN_ID;
+        prev_lsn_ = INVALID_LSN;
+    }
+
+    HeaderRecord(lsn_t global_lsn,lsn_t c_lsn,size_t c_cnt): HeaderRecord(){
+        global_lsn_ = global_lsn;
+        checkpoint_lsn_ = c_lsn;
+        checkpoint_cnt_ = c_cnt;
+        log_tot_len_+= sizeof(lsn_t)*2 + sizeof(size_t);
+    }
+
+    void serialize(char* dest) override {
+        LogRecord::serialize(dest);
+        int offset = LOG_HEADER_SIZE;
+        memcpy(dest+offset,&global_lsn_,sizeof(lsn_t));
+        offset += sizeof(global_lsn_);
+        memcpy(dest+offset,&checkpoint_lsn_,sizeof(lsn_t));
+        offset += sizeof(lsn_t);
+        memcpy(dest+offset,&checkpoint_cnt_,sizeof(size_t));
+    }
+
+    // 从src中反序列化出一条Begin日志记录
+    void deserialize(const char* src) override {
+        LogRecord::deserialize(src);
+        int offset = LOG_HEADER_SIZE;
+        memcpy(&global_lsn_,src+offset,sizeof(lsn_t));
+        offset += sizeof(lsn_t);
+        memcpy(&checkpoint_lsn_,src+offset,sizeof(lsn_t));
+        offset += sizeof(lsn_t);
+        memcpy(&checkpoint_cnt_,src+offset,sizeof(checkpoint_cnt_));
+    }
+
+    virtual void format_print() override {
+        std::cout << "log type in son_function: " << LogTypeStr[log_type_] << "\n";
+        LogRecord::format_print();
+    }
+
+    lsn_t global_lsn_;
+    lsn_t checkpoint_lsn_;
+    size_t checkpoint_cnt_;
+};
+
 class CheckPointRecord: public LogRecord {
 public:
     CheckPointRecord(){
@@ -86,7 +137,7 @@ public:
     }
     
     // 序列化Begin日志记录到dest中
-    void serialize(char* dest) const override {
+    void serialize(char* dest) override {
         LogRecord::serialize(dest);
     }
 
@@ -117,7 +168,7 @@ public:
     }
 
     // 序列化Begin日志记录到dest中
-    void serialize(char* dest) const override {
+    void serialize(char* dest) override {
         LogRecord::serialize(dest);
     }
 
@@ -149,7 +200,7 @@ public:
     }
 
     // 序列化Commit日志记录到dest中
-    void serialize(char* dest) const override {
+    void serialize(char* dest) override {
         LogRecord::serialize(dest);
     }
 
@@ -182,7 +233,7 @@ public:
     }
 
     // 序列化Abort日志记录到dest中
-    void serialize(char* dest) const override {
+    void serialize(char* dest) override {
         LogRecord::serialize(dest);
     }
 
@@ -213,39 +264,36 @@ public:
         log_tid_ = txn_id;
         insert_value_ = insert_value;
         rid_ = rid;
-        log_tot_len_ += sizeof(int);
-        log_tot_len_ += insert_value_.size;
+        log_tot_len_ +=  insert_value.getSize();
         log_tot_len_ += sizeof(Rid);
-        table_name_size_ = table_name.length();
+        table_name_size_ = table_name.size();
         table_name_ = new char[table_name_size_];
         memcpy(table_name_, table_name.c_str(), table_name_size_);
         log_tot_len_ += sizeof(size_t) + table_name_size_;
     }
 
     // 把insert日志记录序列化到dest中
-    void serialize(char* dest) const override {
+    void serialize(char* dest) override {
         LogRecord::serialize(dest);
         int offset = OFFSET_LOG_DATA;
-        memcpy(dest + offset, &insert_value_.size, sizeof(int));
-        offset += sizeof(int);
-        memcpy(dest + offset, insert_value_.data, insert_value_.size);
-        offset += insert_value_.size;
+        offset += insert_value_.serialize(dest+offset);
         memcpy(dest + offset, &rid_, sizeof(Rid));
         offset += sizeof(Rid);
         memcpy(dest + offset, &table_name_size_, sizeof(size_t));
         offset += sizeof(size_t);
         memcpy(dest + offset, table_name_, table_name_size_);
     }
+
     // 从src中反序列化出一条Insert日志记录
     void deserialize(const char* src) override {
         LogRecord::deserialize(src);  
-        insert_value_.Deserialize(src + OFFSET_LOG_DATA);
-        int offset = OFFSET_LOG_DATA + insert_value_.size + sizeof(int);
+        int offset = OFFSET_LOG_DATA;
+        offset += insert_value_.desrialize(src+OFFSET_LOG_DATA);
         rid_ = *reinterpret_cast<const Rid*>(src + offset);
         offset += sizeof(Rid);
         table_name_size_ = *reinterpret_cast<const size_t*>(src + offset);
         offset += sizeof(size_t);
-        table_name_ = new char[table_name_size_];
+        table_name_ = new char[table_name_size_] ;
         memcpy(table_name_, src + offset, table_name_size_);
     }
     void format_print() override {
@@ -282,23 +330,23 @@ DeleteLogRecord() {
         log_tid_ = txn_id;
         delete_value_ = delete_value;
         rid_ = rid;
-        log_tot_len_ += sizeof(int);
-        log_tot_len_ += delete_value_.size;
+        log_tot_len_ += delete_value_.getSize();
         log_tot_len_ += sizeof(Rid);
-        table_name_size_ = table_name.length();
+        table_name_size_ = table_name.size();
         table_name_ = new char[table_name_size_];
         memcpy(table_name_, table_name.c_str(), table_name_size_);
         log_tot_len_ += sizeof(size_t) + table_name_size_;
     }
 
     // 把delete日志记录序列化到dest中
-    void serialize(char* dest) const override {
+    void serialize(char* dest) override {
         LogRecord::serialize(dest);
         int offset = OFFSET_LOG_DATA;
-        memcpy(dest + offset, &delete_value_.size, sizeof(int));
-        offset += sizeof(int);
-        memcpy(dest + offset, delete_value_.data, delete_value_.size);
-        offset += delete_value_.size;
+        // memcpy(dest + offset, &delete_value_.size, sizeof(int));
+        // offset += sizeof(int);
+        // memcpy(dest + offset, delete_value_.data, delete_value_.size);
+        // offset += delete_value_.size;
+        offset += delete_value_.serialize(dest+offset);
         memcpy(dest + offset, &rid_, sizeof(Rid));
         offset += sizeof(Rid);
         memcpy(dest + offset, &table_name_size_, sizeof(size_t));
@@ -309,8 +357,9 @@ DeleteLogRecord() {
     // 从src中反序列化出一条Delete日志记录
     void deserialize(const char* src) override {
         LogRecord::deserialize(src);  
-        delete_value_.Deserialize(src + OFFSET_LOG_DATA);
-        int offset = OFFSET_LOG_DATA + delete_value_.size + sizeof(int);
+        //delete_value_.Deserialize(src + OFFSET_LOG_DATA);
+        int offset = OFFSET_LOG_DATA;
+        offset +=delete_value_.desrialize(src+offset);
         rid_ = *reinterpret_cast<const Rid*>(src + offset);
         offset += sizeof(Rid);
         table_name_size_ = *reinterpret_cast<const size_t*>(src + offset);
@@ -354,27 +403,30 @@ public:
         old_value_ = old_value;
         new_value_ = new_value;
         rid_ = rid;
-        log_tot_len_ += sizeof(int) * 2;
-        log_tot_len_ += old_value_.size + new_value_.size;
+        //log_tot_len_ += sizeof(int) * 2;
+        log_tot_len_+= old_value_.getSize() + new_value_.getSize();
+        //log_tot_len_ += old_value_.size + new_value_.size;
         log_tot_len_ += sizeof(Rid);
-        table_name_size_ = table_name.length();
+        table_name_size_ = table_name.size();
         table_name_ = new char[table_name_size_];
         memcpy(table_name_, table_name.c_str(), table_name_size_);
         log_tot_len_ += sizeof(size_t) + table_name_size_;
     }
 
     // 把update日志记录序列化到dest中
-    void serialize(char* dest) const override {
+    void serialize(char* dest) override {
         LogRecord::serialize(dest);
         int offset = OFFSET_LOG_DATA;
-        memcpy(dest + offset, &old_value_.size, sizeof(int));
-        offset += sizeof(int);
-        memcpy(dest + offset, old_value_.data, old_value_.size);
-        offset += old_value_.size;
-        memcpy(dest + offset, &new_value_.size, sizeof(int));
-        offset += sizeof(int);
-        memcpy(dest + offset, new_value_.data, new_value_.size);
-        offset += new_value_.size;
+        // memcpy(dest + offset, &old_value_.size, sizeof(int));
+        // offset += sizeof(int);
+        // memcpy(dest + offset, old_value_.data, old_value_.size);
+        // offset += old_value_.size;
+        // memcpy(dest + offset, &new_value_.size, sizeof(int));
+        // offset += sizeof(int);
+        // memcpy(dest + offset, new_value_.data, new_value_.size);
+        // offset += new_value_.size;
+        offset += old_value_.serialize(dest+offset);
+        offset += new_value_.serialize(dest+offset);
         memcpy(dest + offset, &rid_, sizeof(Rid));
         offset += sizeof(Rid);
         memcpy(dest + offset, &table_name_size_, sizeof(size_t));
@@ -385,10 +437,13 @@ public:
     // 从src中反序列化出一条Update日志记录
     void deserialize(const char* src) override {
         LogRecord::deserialize(src);  
-        old_value_.Deserialize(src + OFFSET_LOG_DATA);
-        int offset = OFFSET_LOG_DATA + old_value_.size + sizeof(int);
-        new_value_.Deserialize(src + offset);
-        offset += new_value_.size + sizeof(int);
+        //old_value_.Deserialize(src + OFFSET_LOG_DATA);
+        //int offset = OFFSET_LOG_DATA + old_value_.size + sizeof(int);
+        //new_value_.Deserialize(src + offset);
+        //offset += new_value_.size + sizeof(int);
+        int offset = OFFSET_LOG_DATA;
+        offset += old_value_.desrialize(src+offset);
+        offset += new_value_.desrialize(src+offset);
         rid_ = *reinterpret_cast<const Rid*>(src + offset);
         offset += sizeof(Rid);
         table_name_size_ = *reinterpret_cast<const size_t*>(src + offset);
@@ -441,13 +496,27 @@ public:
     int offset_;    // 写入log的offset
 };
 
+
 /* 日志管理器，负责把日志写入日志缓冲区，以及把日志缓冲区中的内容写入磁盘中 */
 class LogManager {
 public:
     LogManager(DiskManager* disk_manager,BufferPoolManager* buf_mgr) { 
         disk_manager_ = disk_manager;
         buf_mgr_ = buf_mgr;
-        global_lsn_.store(0);
+    }
+
+    void recovery_log_info(){
+        //恢复global_lsn_
+        int hdr_sz = LOG_HEADER_SIZE+sizeof(lsn_t)*2+sizeof(size_t);
+        char buf[hdr_sz];
+        disk_manager_->read_log_header(buf,hdr_sz);
+        HeaderRecord h_rec;
+        h_rec.deserialize(buf);
+
+        if(h_rec.log_type_ != LogType::HEADER){
+            throw InternalError("log typw is not logheader");
+        }
+        global_lsn_.store(h_rec.global_lsn_);
     }
     
     lsn_t add_log_to_buffer(LogRecord* log_record);

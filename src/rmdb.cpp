@@ -311,8 +311,6 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-
-
     signal(SIGINT, sigint_handler);
     try {
         std::cout << "\n"
@@ -335,15 +333,18 @@ int main(int argc, char **argv) {
         }
         // Open database
         sm_manager->open_db(db_name);
+        log_manager->recovery_log_info();
 
         // recovery database
         if (chdir(db_name.c_str()) < 0) {  // 进入名为db_name的目录
             throw UnixError();
         }
-        
+
         recovery->analyze();
         recovery->redo();
+        std::cout<<"finish redo"<<std::endl; 
         recovery->undo();
+        std::cout<<"finish undo"<<std::endl; 
 
         if (chdir("..") < 0) {
             throw UnixError();

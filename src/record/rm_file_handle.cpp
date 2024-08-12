@@ -79,31 +79,80 @@ Rid RmFileHandle::insert_record(char* buf, Context* context) {
  * @param {char*} buf 要插入记录的数据
  */
 void RmFileHandle::insert_record(const Rid& rid, char* buf) {
-     // 1. 获取指定页面的页面句柄
-    RmPageHandle page_handle = fetch_page_handle(rid.page_no);
-
+    // 1. 获取指定页面的页面句柄
+    auto page_handle = fetch_page_handle(rid.page_no);
+    
     // 2. 检查指定位置是否已存在记录，如果存在则抛出异常
     if (Bitmap::is_set(page_handle.bitmap, rid.slot_no)) {
-        throw std::runtime_error("The specified slot is already occupied.");
+        //throw std::runtime_error("The specified slot is already occupied.");
+        std::cout<<"insert: The specified slot is already occupied.["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
+        return;
     }
-
+    std::cout<<"insert:["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
     // 3. 将buf复制到指定slot位置
     char* slot_addr = page_handle.get_slot(rid.slot_no);
     memcpy(slot_addr, buf, file_hdr_.record_size);
-
     // 4. 更新页面头部的bitmap和记录数
     Bitmap::set(page_handle.bitmap, rid.slot_no);
     page_handle.page_hdr->num_records++;
-
     // 5. 如果页面已满，则更新file_hdr_.first_free_page_no
     if (page_handle.page_hdr->num_records == file_hdr_.num_records_per_page) {
         file_hdr_.first_free_page_no = page_handle.page_hdr->next_free_page_no;
         page_handle.page_hdr->next_free_page_no = RM_NO_PAGE;
     }
-
     // 标记页面为脏页并unpin
     page_handle.page->set_dirty(true);
     buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), true);
+}
+
+void RmFileHandle::insert_record_for_recovery(const Rid& rid, char* buf) {
+    if (rid.page_no == INVALID_PAGE_ID || rid.page_no <0){
+        throw PageNotExistError("tbname",rid.page_no);
+    }
+    PageId pid(fd_,rid.page_no);
+    Page* page;
+    RmPageHandle* page_handle;
+    try
+    {
+        page = buffer_pool_manager_->fetch_page(pid);
+        if (page == nullptr) {
+            throw std::runtime_error("Failed to fetch page from buffer pool.");
+        }
+        page_handle = new RmPageHandle(&file_hdr_,page);
+    }
+    catch(const std::exception& e)
+    {
+        PageId pid(fd_,-1);
+        page = buffer_pool_manager_->new_page(&pid,rid.page_no);
+
+        RmPageHandle new_page_handle(&file_hdr_, page);
+        RmPageHdr *page_hdr = new_page_handle.page_hdr;
+        page_hdr->next_free_page_no = RM_NO_PAGE;
+        page_hdr->num_records = 0;
+        std::memset(new_page_handle.bitmap, 0, file_hdr_.bitmap_size);
+
+        page_handle = new RmPageHandle(&file_hdr_,page);
+    }
+    if (Bitmap::is_set(page_handle->bitmap, rid.slot_no)) {
+        //throw std::runtime_error("The specified slot is already occupied.");
+        std::cout<<"insert: The specified slot is already occupied.["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
+        return;
+    }
+    std::cout<<"insert:["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
+    // 3. 将buf复制到指定slot位置
+    char* slot_addr = page_handle->get_slot(rid.slot_no);
+    memcpy(slot_addr, buf, file_hdr_.record_size);
+    // 4. 更新页面头部的bitmap和记录数
+    Bitmap::set(page_handle->bitmap, rid.slot_no);
+    page_handle->page_hdr->num_records++;
+    // 5. 如果页面已满，则更新file_hdr_.first_free_page_no
+    if (page_handle->page_hdr->num_records == file_hdr_.num_records_per_page) {
+        file_hdr_.first_free_page_no = page_handle->page_hdr->next_free_page_no;
+        page_handle->page_hdr->next_free_page_no = RM_NO_PAGE;
+    }
+    // 标记页面为脏页并unpin
+    page_handle->page->set_dirty(true);
+    buffer_pool_manager_->unpin_page(page_handle->page->get_page_id(), true);
 }
 
 /**
@@ -122,9 +171,11 @@ void RmFileHandle::delete_record(const Rid& rid, Context* context) {
 
     // 2. 检查指定位置是否有记录
     if (!Bitmap::is_set(page_handle.bitmap, rid.slot_no)) {
-        throw std::runtime_error("The specified slot is already empty.");
+        //throw std::runtime_error("The specified slot is already empty.");
+        std::cout<<"delete: The specified slot is already empty.["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
+        return;
     }
-
+    std::cout<<"delete:["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
     // 3. 将bitmap中指定位置的bit清除，并更新页面头部的记录数
     Bitmap::reset(page_handle.bitmap, rid.slot_no);
     page_handle.page_hdr->num_records--;
@@ -142,6 +193,57 @@ void RmFileHandle::delete_record(const Rid& rid, Context* context) {
     buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), true);
 }
 
+void RmFileHandle::delete_record_for_recovery(const Rid &rid, Context *context){
+    if (rid.page_no == INVALID_PAGE_ID || rid.page_no <0){
+        throw PageNotExistError("tbname",rid.page_no);
+    }
+    PageId pid(fd_,rid.page_no);
+    Page* page;
+    RmPageHandle* page_handle;
+    try
+    {
+        page = buffer_pool_manager_->fetch_page(pid);
+        if (page == nullptr) {
+            throw std::runtime_error("Failed to fetch page from buffer pool.");
+        }
+        page_handle = new RmPageHandle(&file_hdr_,page);
+    }
+    catch(const std::exception& e)
+    {
+        PageId pid(fd_,-1);
+        page = buffer_pool_manager_->new_page(&pid,rid.page_no);
+
+        RmPageHandle new_page_handle(&file_hdr_, page);
+        RmPageHdr *page_hdr = new_page_handle.page_hdr;
+        page_hdr->next_free_page_no = RM_NO_PAGE;
+        page_hdr->num_records = 0;
+        std::memset(new_page_handle.bitmap, 0, file_hdr_.bitmap_size);
+
+        page_handle = new RmPageHandle(&file_hdr_,page);
+    }
+    // 2. 检查指定位置是否有记录
+    if (!Bitmap::is_set(page_handle->bitmap, rid.slot_no)) {
+        //throw std::runtime_error("The specified slot is already empty.");
+        std::cout<<"delete: The specified slot is already empty.["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
+        return;
+    }
+    std::cout<<"delete:["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
+    // 3. 将bitmap中指定位置的bit清除，并更新页面头部的记录数
+    Bitmap::reset(page_handle->bitmap, rid.slot_no);
+    page_handle->page_hdr->num_records--;
+
+    char* slot = page_handle->get_slot(rid.slot_no);
+    memset(slot, 0, file_hdr_.record_size);
+
+    // 4. 如果页面在删除记录后变得未满，调用release_page_handle()进行处理
+    if (page_handle->page_hdr->num_records < file_hdr_.num_records_per_page) {
+        release_page_handle(*page_handle);
+    }
+
+    // 标记页面为脏页并unpin
+    page_handle->page->set_dirty(true);
+    buffer_pool_manager_->unpin_page(page_handle->page->get_page_id(), true);
+}
 
 /**
  * @description: 更新记录文件中记录号为rid的记录
@@ -157,8 +259,11 @@ void RmFileHandle::update_record(const Rid& rid, char* buf, Context* context) {
     RmPageHandle page_handle = fetch_page_handle(rid.page_no);
     // 2. 检查指定位置是否有记录
     if (!Bitmap::is_set(page_handle.bitmap, rid.slot_no)) {
-        throw std::runtime_error("The specified slot does not contain a record.");
+        //throw std::runtime_error("The specified slot does not contain a record.");
+        std::cout<<"update: The specified slot does not contain a record.["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
+        return;
     }
+    std::cout<<"update:["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
     // 3. 更新指定slot位置的数据
     char* slot = page_handle.get_slot(rid.slot_no);
     //memset(slot,0,file_hdr_.record_size);
@@ -168,6 +273,49 @@ void RmFileHandle::update_record(const Rid& rid, char* buf, Context* context) {
    buffer_pool_manager_->unpin_page(page_handle.page->get_page_id(), true);
 }
 
+void RmFileHandle::update_record_for_recovery(const Rid &rid, char *buf, Context *context){
+    if (rid.page_no == INVALID_PAGE_ID || rid.page_no <0){
+        throw PageNotExistError("tbname",rid.page_no);
+    }
+    PageId pid(fd_,rid.page_no);
+    Page* page;
+    RmPageHandle* page_handle;
+    try
+    {
+        page = buffer_pool_manager_->fetch_page(pid);
+        if (page == nullptr) {
+            throw std::runtime_error("Failed to fetch page from buffer pool.");
+        }
+        page_handle = new RmPageHandle(&file_hdr_,page);
+    }
+    catch(const std::exception& e)
+    {
+        PageId pid(fd_,-1);
+        page = buffer_pool_manager_->new_page(&pid,rid.page_no);
+
+        RmPageHandle new_page_handle(&file_hdr_, page);
+        RmPageHdr *page_hdr = new_page_handle.page_hdr;
+        page_hdr->next_free_page_no = RM_NO_PAGE;
+        page_hdr->num_records = 0;
+        std::memset(new_page_handle.bitmap, 0, file_hdr_.bitmap_size);
+
+        page_handle = new RmPageHandle(&file_hdr_,page);
+    }
+    // 2. 检查指定位置是否有记录
+    if (!Bitmap::is_set(page_handle->bitmap, rid.slot_no)) {
+        //throw std::runtime_error("The specified slot does not contain a record.");
+        std::cout<<"update: The specified slot does not contain a record.["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
+        return;
+    }
+    std::cout<<"update:["<<rid.page_no<<","<<rid.slot_no<<"]"<<std::endl;
+    // 3. 更新指定slot位置的数据
+    char* slot = page_handle->get_slot(rid.slot_no);
+    //memset(slot,0,file_hdr_.record_size);
+    memcpy(slot, buf, file_hdr_.record_size);
+    // 4. 标记页面为脏页
+   page_handle->page->set_dirty(true);
+   buffer_pool_manager_->unpin_page(page_handle->page->get_page_id(), true);
+}
 /**
  * 以下函数为辅助函数，仅提供参考，可以选择完成如下函数，也可以删除如下函数，在单元测试中不涉及如下函数接口的直接调用
 */

@@ -18,6 +18,7 @@ See the Mulan PSL v2 for more details. */
 #include "record/rm.h"
 #include "record_printer.h"
 #include "errors.h"
+#include "recovery/log_manager.h"
 
 /**
  * @description: 判断是否为一个文件夹
@@ -58,6 +59,13 @@ void SmManager::create_db(const std::string& db_name) {
 
     // 创建日志文件
     disk_manager_->create_file(LOG_FILE_NAME);
+    int log_fd = disk_manager_->open_file(LOG_FILE_NAME);
+    disk_manager_->SetLogFd(log_fd);
+    HeaderRecord *hrec = new HeaderRecord(36,-1,0);
+    char hdr_buf[hrec->log_tot_len_];
+    hrec->serialize(hdr_buf);
+    disk_manager_->write_log_header(hdr_buf,hrec->log_tot_len_);
+    disk_manager_->close_file(log_fd);
 
     // 创建启动文件
     disk_manager_->create_file(START_FILE_NAME);

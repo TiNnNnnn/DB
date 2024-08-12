@@ -70,6 +70,10 @@ class DiskManager {
 
     void write_log(char *log_data, int size);
 
+    int read_log_header(char *log_header,int size);
+
+    void write_log_header(char *log_data,int size);
+
     int read_start_file(char *data,int size,int offset);
 
     void write_start_file(char *data,int size);
