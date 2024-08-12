@@ -165,13 +165,13 @@ class IxNodeHandle {
         return rid_idx;
     }
 
-    void latch() {
-        node_mutex_.lock();
-    }
+    // void latch() {
+    //     node_mutex_.lock();
+    // }
 
-    void unlatch() {
-        node_mutex_.unlock();
-    }
+    // void unlatch() {
+    //     node_mutex_.unlock();
+    // }
 };
 
 /* B+树 */
