@@ -102,8 +102,13 @@ class UpdateExecutor : public AbstractExecutor {
             bool exist = false;
             scan_ = std::make_unique<RmScan>(fh_);
             while (!scan_->is_end()) {
-                    auto rid = scan_->rid();
-                    auto record = fh_->get_record(rid,nullptr);
+                    auto r = scan_->rid();
+                    auto record = fh_->get_record(r,nullptr);
+                    if(r.page_no == rid.page_no && r.slot_no == rid.slot_no){
+                        //跳过待更新的RID
+                        scan_->next();
+                        continue;
+                    }
                     if(memcmp(rec->data,record->data,record->size) == 0 && record->size == rec->size){
                         exist = true;
                         break;
