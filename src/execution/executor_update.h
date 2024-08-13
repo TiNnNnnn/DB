@@ -25,6 +25,7 @@ class UpdateExecutor : public AbstractExecutor {
     std::string tab_name_;
     std::vector<SetClause> set_clauses_;
     SmManager *sm_manager_;
+    std::unique_ptr<RecScan> scan_;
 
    public:
     UpdateExecutor(SmManager *sm_manager, const std::string &tab_name, std::vector<SetClause> set_clauses,
@@ -37,6 +38,8 @@ class UpdateExecutor : public AbstractExecutor {
         conds_ = conds;
         rids_ = rids;
         context_ = context;
+
+        
     }
     
     std::unique_ptr<RmRecord> Next() override {
@@ -83,7 +86,6 @@ class UpdateExecutor : public AbstractExecutor {
                 ih->delete_entry(old_keys[i], context_->txn_);
                 delete[] old_keys[i];
             }
-
             // 插入新索引项
             for (const auto &index : tab_.indexes) {
                 char *new_key = new char[index.col_tot_len];
@@ -96,15 +98,31 @@ class UpdateExecutor : public AbstractExecutor {
                 ih->insert_entry(new_key, rid, context_->txn_);
                 delete[] new_key;
             }
-            //加入write_set
-            WriteRecord *wr = new WriteRecord (WType::UPDATE_TUPLE,tab_.name,rid,old_rec,*rec);
-            context_->txn_->append_write_record(wr);
-            //加入log_buffer
-            UpdateLogRecord *update_log_record = new UpdateLogRecord(context_->txn_->get_transaction_id(),old_rec,*rec,rid,tab_name_);
-            context_->log_mgr_->add_log_to_buffer(update_log_record);
 
-            // 更新记录到文件
-            fh_->update_record(rid, rec->data, context_);
+            bool exist = false;
+            scan_ = std::make_unique<RmScan>(fh_);
+            while (!scan_->is_end()) {
+                    auto rid = scan_->rid();
+                    auto record = fh_->get_record(rid,nullptr);
+                    if(memcmp(rec->data,record->data,record->size) == 0 && record->size == rec->size){
+                        exist = true;
+                        break;
+                    }
+                    scan_->next();
+            }
+
+            if(!exist){
+                //加入write_set
+                WriteRecord *wr = new WriteRecord (WType::UPDATE_TUPLE,tab_.name,rid,old_rec,*rec);
+                context_->txn_->append_write_record(wr);
+                //加入log_buffer
+                UpdateLogRecord *update_log_record = new UpdateLogRecord(context_->txn_->get_transaction_id(),old_rec,*rec,rid,tab_name_);
+                context_->log_mgr_->add_log_to_buffer(update_log_record);
+
+                // 更新记录到文件
+                fh_->update_record(rid, rec->data, context_);
+            }
+            
         }
         return nullptr;
     }
