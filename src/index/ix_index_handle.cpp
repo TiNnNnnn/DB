@@ -147,9 +147,6 @@ int IxNodeHandle::insert(const char *key, const Rid &value) {
     int pos = lower_bound(key);
 
     int cmp = ix_compare(get_key(pos), key, file_hdr->col_types_,file_hdr->col_lens_);
-    if(cmp == 0){
-        throw InternalError("key has exeist in index");
-    }
 
     if (pos == get_size() || cmp > 0) {
         insert_pair(pos, key, value);
@@ -393,13 +390,22 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
 
     std::unique_lock<std::mutex>lock(root_latch_);
 	auto [leaf,b] = find_leaf_page(key, Operation::INSERT, transaction);
-	int cur_size = leaf->get_size(); //current size	    
-	if(leaf->insert(key,value)== cur_size){
-        //主键重复，不允许插入
-		buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);	
+	int cur_size = leaf->get_size(); //current size
+
+
+    int pos = leaf->lower_bound(key);
+    int cmp = ix_compare(leaf->get_key(pos), key, file_hdr_->col_types_,file_hdr_->col_lens_);
+    if (pos == leaf->get_size() || cmp > 0) {
+        leaf->insert_pair(pos, key, value);
+    }else{
+        buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);
+        if(cmp == 0){
+            throw InternalError("key has exists in index");
+        }
 		return false;
-	}
-	else if(leaf->get_size() == leaf->get_max_size()){//当前节点已满，需要进行分裂
+    }
+
+	if(leaf->get_size() == leaf->get_max_size()){//当前节点已满，需要进行分裂
 		IxNodeHandle* new_node = split(leaf);
 		if(leaf->get_page_no() == file_hdr_->last_leaf_)
             //更新last_leaf;
