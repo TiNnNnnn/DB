@@ -60,27 +60,31 @@ class InsertExecutor : public AbstractExecutor {
             memcpy(rec.data + col.offset, val.raw->data, col.len);
         }
 
+        bool exist = false;
         //check if record has been exist
         scan_ = std::make_unique<RmScan>(fh_);
         while (!scan_->is_end()) {
             rid_ = scan_->rid();
             auto record = fh_->get_record(rid_,nullptr);
             if(memcmp(rec.data,record->data,record->size) == 0 && record->size == rec.size){
-                return nullptr;
+                exist = true;
+                break;
             }
             scan_->next();
         }
 
         // Insert into record file
-        rid_ = fh_->insert_record(rec.data, context_);
-
-        //加入write_set
-        WriteRecord* wr = new WriteRecord(WType::INSERT_TUPLE,tab_.name,rid_,rec);
-        context_->txn_->append_write_record(wr);
+        if(!exist){
+            rid_ = fh_->insert_record(rec.data, context_);
+            //加入write_set
+            WriteRecord* wr = new WriteRecord(WType::INSERT_TUPLE,tab_.name,rid_,rec);
+            context_->txn_->append_write_record(wr);
+            
+            //加入log_buffer
+            InsertLogRecord *insert_log_record = new InsertLogRecord(context_->txn_->get_transaction_id(),rec,rid_,tab_.name);
+            context_->log_mgr_->add_log_to_buffer(insert_log_record);
+        }
         
-        //加入log_buffer
-        InsertLogRecord *insert_log_record = new InsertLogRecord(context_->txn_->get_transaction_id(),rec,rid_,tab_.name);
-        context_->log_mgr_->add_log_to_buffer(insert_log_record);
 
         // Insert into index
         for(size_t i = 0; i < tab_.indexes.size(); ++i) {

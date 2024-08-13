@@ -385,19 +385,20 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
     
     // 1. 查找key值应该插入到哪个叶子节点
 
-    //std::unique_lock lock{root_latch_};//set lock
     std::unique_lock<std::mutex>lock(root_latch_);
-
 	auto [leaf,b] = find_leaf_page(key, Operation::INSERT, transaction);
 	int cur_size = leaf->get_size(); //current size	    
-	if(leaf->insert(key,value)== cur_size){// can not insert
-		buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);	
+	if(leaf->insert(key,value)== cur_size){
+        //主键重复，不允许插入
+		buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);
+        throw InternalError("key has exisit in node");	
 		return false;
 	}
-	else if(leaf->get_size() == leaf->get_max_size()){ // leaf is full
-		IxNodeHandle* new_node = split(leaf); //split
+	else if(leaf->get_size() == leaf->get_max_size()){//当前节点已满，需要进行分裂
+		IxNodeHandle* new_node = split(leaf);
 		if(leaf->get_page_no() == file_hdr_->last_leaf_)
-			file_hdr_->last_leaf_ = new_node->get_page_no(); //renew last leaf
+            //更新last_leaf;
+			file_hdr_->last_leaf_ = new_node->get_page_no();
 		insert_into_parent(leaf, new_node->get_key(0), new_node, transaction);
 		buffer_pool_manager_->unpin_page(new_node->get_page_id(), true);//unpin
 	}
