@@ -115,7 +115,6 @@ class UpdateExecutor : public AbstractExecutor {
                     }
                     scan_->next();
             }
-
             if(!exist){
                 //加入write_set
                 WriteRecord *wr = new WriteRecord (WType::UPDATE_TUPLE,tab_.name,rid,old_rec,*rec);
@@ -127,7 +126,6 @@ class UpdateExecutor : public AbstractExecutor {
                 // 更新记录到文件
                 fh_->update_record(rid, rec->data, context_);
             }
-            
         }
         return nullptr;
     }

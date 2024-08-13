@@ -261,7 +261,7 @@ bool IxIndexHandle::get_value(const char *key, std::vector<Rid> *result, Transac
     // 1. 获取目标key值所在的叶子结点
     std::pair<IxNodeHandle *, bool> leaf_root_pair = find_leaf_page(key, Operation::FIND, transaction);
     IxNodeHandle *leaf_node = leaf_root_pair.first;
-    bool root_is_latched = leaf_root_pair.second;
+    //bool root_is_latched = leaf_root_pair.second;
 
     // 2. 在叶子节点中查找目标key值的位置，并读取key对应的rid
     bool key_exists = false;
@@ -422,8 +422,9 @@ bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
 	auto [leaf,b] = find_leaf_page(key, Operation::DELETE, transaction);
     
 	int size = leaf->get_size();
-	if(leaf->remove(key) == size){// cannot remove
-		buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);	
+	if(leaf->remove(key) == size){
+		buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);
+        throw InternalError("delete failed");	
 		return false;
 	}
 	else{
