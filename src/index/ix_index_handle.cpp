@@ -145,7 +145,13 @@ int IxNodeHandle::insert(const char *key, const Rid &value) {
     // 4. 返回完成插入操作之后的键值对数量
 
     int pos = lower_bound(key);
-    if (pos == get_size() || ix_compare(get_key(pos), key, file_hdr->col_types_,file_hdr->col_lens_) > 0) {
+
+    int cmp = ix_compare(get_key(pos), key, file_hdr->col_types_,file_hdr->col_lens_);
+    if(cmp == 0){
+        throw InternalError("key has exeist in index");
+    }
+
+    if (pos == get_size() || cmp > 0) {
         insert_pair(pos, key, value);
     }
     return get_size();
@@ -390,8 +396,7 @@ page_id_t IxIndexHandle::insert_entry(const char *key, const Rid &value, Transac
 	int cur_size = leaf->get_size(); //current size	    
 	if(leaf->insert(key,value)== cur_size){
         //主键重复，不允许插入
-		buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);
-        throw InternalError("key has exisit in node");	
+		buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);	
 		return false;
 	}
 	else if(leaf->get_size() == leaf->get_max_size()){//当前节点已满，需要进行分裂
@@ -424,7 +429,7 @@ bool IxIndexHandle::delete_entry(const char *key, Transaction *transaction) {
 	int size = leaf->get_size();
 	if(leaf->remove(key) == size){
 		buffer_pool_manager_->unpin_page(leaf->get_page_id(), false);
-        throw InternalError("delete failed");	
+        //throw InternalError("delete failed");	
 		return false;
 	}
 	else{
